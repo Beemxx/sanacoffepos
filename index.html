@@ -395,6 +395,52 @@ canvas{width:100%!important}
 
 /* number format helper visual */
 .currency::before{content:'Rp '}
+
+/* ===== PRINT STYLES (Android & Desktop) ===== */
+@media print {
+  /* Sembunyikan semua elemen kecuali struk */
+  body * { visibility: hidden !important; }
+
+  /* Tampilkan hanya konten struk */
+  #receipt-content,
+  #receipt-content * { visibility: visible !important; }
+
+  /* Posisikan struk di pojok kiri atas */
+  #receipt-content {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+  }
+
+  /* Pastikan background/warna tercetak */
+  .receipt {
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 12px !important;
+    font-size: 11px !important;
+    color: #000 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sembunyikan tombol-tombol di footer modal */
+  .modal-footer,
+  .modal-header,
+  .topbar,
+  .nav,
+  #toast-container,
+  #login-screen { display: none !important; }
+
+  /* Hindari page break di dalam struk */
+  .receipt { page-break-inside: avoid; }
+}
 </style>
 </head>
 <body>
@@ -2164,7 +2210,7 @@ async function checkout(){
     const disc=getCartDisc();
     const sale={
       id:genId('S'), date:today(), datetime:new Date().toISOString(),
-      customer:document.getElementById('customer-name').value||'Umum',
+      customer:(document.getElementById('customer-name').value||'').trim()||'Umum',
       subtotal:sub, discount:disc, total,
       payment:selectedPayment,
       change:selectedPayment==='tunai'?(parseFloat(document.getElementById('cash-input').value)||0)-total:0,
@@ -2193,8 +2239,18 @@ async function checkout(){
     // Deduct bahan baku based on recipe
     deductBahanBakuFromSale(sale.items);
 
-    showReceipt(sale);
+    // Reset form kasir setelah transaksi berhasil
+    cart=[];
+    document.getElementById('customer-name').value='';
+    document.getElementById('discount-input').value='';
+    document.getElementById('cash-input').value='';
+    document.getElementById('change-display').innerHTML='';
+    setPayment('tunai');
+    renderCart();
+    updateCartTotals();
     filterPOS();
+
+    showReceipt(sale);
   } catch(err){
     toast('Gagal menyimpan transaksi: '+err.message,'error');
   } finally {
@@ -2228,7 +2284,7 @@ function showReceipt(sale){
     </div>`;
   openModal('modal-receipt');
 }
-function printReceipt(){window.print();}
+function printReceipt(){setTimeout(function(){window.print();},300);}
 
 // ===================== BLUETOOTH THERMAL PRINTER =====================
 let btDevice=null,btCharacteristic=null,lastSaleData=null;
