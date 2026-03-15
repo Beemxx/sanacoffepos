@@ -2324,39 +2324,50 @@ async function connectBluetooth(){
   if(btnC){btnC.disabled=true;btnC.textContent='🔍 Mencari...';}
 
   try{
-    // acceptAllDevices agar semua jenis printer thermal bisa terdeteksi
-    btDevice=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:PRINTER_SERVICES});
+    // Filter spesifik ke printer RPP02N — Android langsung scan hanya perangkat ini,
+    // tidak perlu tampilkan semua BLE device di sekitar → jauh lebih cepat.
+    // Fallback ke acceptAllDevices jika printer tidak ketemu (ganti printer, dll).
+    let dev=null;
+    try{
+      dev=await navigator.bluetooth.requestDevice({
+        filters:[{namePrefix:'RPP02N'},{namePrefix:'RPP02'},{namePrefix:'RPP'}]
+      });
+    }catch(filterErr){
+      if(filterErr.name==='NotFoundError'||filterErr.name==='TypeError'){
+        dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true});
+      }else{
+        throw filterErr;
+      }
+    }
+    btDevice=dev;
     btDevice.addEventListener('gattserverdisconnected',onBtDisconnected);
 
     if(btnC) btnC.textContent='⚡ Konek...';
     const server=await btDevice.gatt.connect();
 
     if(btnC) btnC.textContent='🔧 Inisialisasi...';
-    // Cari service secara PARALEL (bukan serial) — jauh lebih cepat
-    const svcResults=await Promise.allSettled(
-      PRINTER_SERVICES.map(id=>server.getPrimaryService(id))
-    );
+
+    // Ambil semua service yang tersedia dari printer — lebih cepat & kompatibel
     let svc=null;
-    for(const r of svcResults){if(r.status==='fulfilled'){svc=r.value;break;}}
-    // Fallback: ambil semua service lalu pilih yang pertama
-    if(!svc){
-      try{const ss=await server.getPrimaryServices();if(ss.length)svc=ss[0];}catch(e){}
-    }
+    try{
+      const allSvcs=await server.getPrimaryServices();
+      // Prioritaskan UUID printer yang dikenal, fallback ke service pertama
+      const knownSet=new Set(PRINTER_SERVICES);
+      svc=allSvcs.find(s=>knownSet.has(s.uuid))||allSvcs[0]||null;
+    }catch(e){}
     if(!svc)throw new Error('Service printer tidak ditemukan. Pastikan printer ESC/POS.');
 
-    // Cari characteristic secara PARALEL juga
-    const chResults=await Promise.allSettled(
-      PRINTER_CHARS.map(id=>svc.getCharacteristic(id))
-    );
+    // Ambil semua characteristic lalu pilih yang bisa write
     let ch=null;
-    for(const r of chResults){if(r.status==='fulfilled'){ch=r.value;break;}}
-    // Fallback: scan semua characteristic, pilih yang bisa write
-    if(!ch){
-      try{
-        const cs=await svc.getCharacteristics();
-        for(const c of cs){if(c.properties.write||c.properties.writeWithoutResponse){ch=c;break;}}
-      }catch(e){}
-    }
+    try{
+      const allCs=await svc.getCharacteristics();
+      const knownSet=new Set(PRINTER_CHARS);
+      // Prioritaskan UUID char yang dikenal dulu
+      ch=allCs.find(c=>knownSet.has(c.uuid)&&(c.properties.write||c.properties.writeWithoutResponse))
+        ||allCs.find(c=>c.properties.writeWithoutResponse)
+        ||allCs.find(c=>c.properties.write)
+        ||null;
+    }catch(e){}
     if(!ch)throw new Error('Characteristic write tidak ditemukan.');
 
     btCharacteristic=ch;
