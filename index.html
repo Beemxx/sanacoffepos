@@ -2301,12 +2301,27 @@ let btDevice=null,btCharacteristic=null,lastSaleData=null;
 const ESC=0x1B,GS=0x1D;
 const ESC_INIT=[ESC,0x40],ESC_CENTER=[ESC,0x61,0x01],ESC_LEFT=[ESC,0x61,0x00];
 const ESC_BOLD_ON=[ESC,0x45,0x01],ESC_BOLD_OFF=[ESC,0x45,0x00];
-// BUG FIX: ESC_BIG hanya 2x lebar & 2x tinggi (0x11), selalu diikuti ESC_NORMAL
 const ESC_BIG=[GS,0x21,0x11],ESC_NORMAL=[GS,0x21,0x00];
 const ESC_CUT=[GS,0x56,0x42,0x00],LF=[0x0A];
 const FEED=(n)=>[ESC,0x64,n];
-const PRINTER_SERVICES=['e7810a71-73ae-499d-8c15-faa9aef0c3f2','000018f0-0000-1000-8000-00805f9b34fb','49535343-fe7d-4ae5-8fa9-9fafd205e455','6e400001-b5a3-f393-e0a9-e50e24dcca9e'];
-const PRINTER_CHARS=['e7810a71-73ae-499d-8c15-faa9aef0c3f2','000018f0-0000-1000-8000-00805f9b34fb','49535343-8841-43f4-a8d4-ecbe34729bb3','6e400002-b5a3-f393-e0a9-e50e24dcca9e'];
+
+// UUID khusus RPP02N (Rongta) — SPP BLE profile
+// 49535343-fe7d = service utama Rongta RPP02N
+// 49535343-8841 = characteristic write (TX)
+// Ditambah UUID umum lain sebagai fallback
+const PRINTER_SERVICES=[
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Rongta RPP02N (prioritas utama)
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Seiko/Epson
+  '000018f0-0000-1000-8000-00805f9b34fb', // Zjiang/common
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
+];
+const PRINTER_CHARS=[
+  '49535343-8841-43f4-a8d4-ecbe34729bb3', // Rongta RPP02N TX (prioritas utama)
+  '49535343-1e4d-4bd9-ba61-23c647249616', // Rongta RPP02N TX alternatif
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  '6e400002-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART TX
+];
 
 function updateBtStatus(connected,name=''){
   const dot=document.getElementById('bt-dot'),lbl=document.getElementById('bt-label');
@@ -2324,17 +2339,23 @@ async function connectBluetooth(){
   if(btnC){btnC.disabled=true;btnC.textContent='🔍 Mencari...';}
 
   try{
-    // Filter spesifik ke printer RPP02N — Android langsung scan hanya perangkat ini,
-    // tidak perlu tampilkan semua BLE device di sekitar → jauh lebih cepat.
-    // Fallback ke acceptAllDevices jika printer tidak ketemu (ganti printer, dll).
+    // Filter nama RPP02N agar scan cepat di Android.
+    // optionalServices WAJIB didaftarkan di sini — Web Bluetooth security policy
+    // melarang akses service yang tidak didaftarkan saat requestDevice.
+    // Tanpa ini getPrimaryServices() akan throw error "Not allowed".
     let dev=null;
     try{
       dev=await navigator.bluetooth.requestDevice({
-        filters:[{namePrefix:'RPP02N'},{namePrefix:'RPP02'},{namePrefix:'RPP'}]
+        filters:[{namePrefix:'RPP02N'},{namePrefix:'RPP02'},{namePrefix:'RPP'}],
+        optionalServices:PRINTER_SERVICES
       });
     }catch(filterErr){
       if(filterErr.name==='NotFoundError'||filterErr.name==='TypeError'){
-        dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true});
+        // Fallback: tampilkan semua device, tetap daftarkan optionalServices
+        dev=await navigator.bluetooth.requestDevice({
+          acceptAllDevices:true,
+          optionalServices:PRINTER_SERVICES
+        });
       }else{
         throw filterErr;
       }
@@ -2347,27 +2368,32 @@ async function connectBluetooth(){
 
     if(btnC) btnC.textContent='🔧 Inisialisasi...';
 
-    // Ambil semua service yang tersedia dari printer — lebih cepat & kompatibel
+    // Cari service — prioritaskan UUID Rongta RPP02N dulu
     let svc=null;
-    try{
-      const allSvcs=await server.getPrimaryServices();
-      // Prioritaskan UUID printer yang dikenal, fallback ke service pertama
-      const knownSet=new Set(PRINTER_SERVICES);
-      svc=allSvcs.find(s=>knownSet.has(s.uuid))||allSvcs[0]||null;
-    }catch(e){}
-    if(!svc)throw new Error('Service printer tidak ditemukan. Pastikan printer ESC/POS.');
+    for(const id of PRINTER_SERVICES){
+      try{svc=await server.getPrimaryService(id);break;}catch(e){}
+    }
+    // Fallback: ambil service pertama yang tersedia
+    if(!svc){
+      try{const ss=await server.getPrimaryServices();if(ss.length)svc=ss[0];}catch(e){}
+    }
+    if(!svc)throw new Error('Service printer tidak ditemukan.');
 
-    // Ambil semua characteristic lalu pilih yang bisa write
+    // Cari characteristic write — prioritaskan UUID Rongta RPP02N dulu
     let ch=null;
-    try{
-      const allCs=await svc.getCharacteristics();
-      const knownSet=new Set(PRINTER_CHARS);
-      // Prioritaskan UUID char yang dikenal dulu
-      ch=allCs.find(c=>knownSet.has(c.uuid)&&(c.properties.write||c.properties.writeWithoutResponse))
-        ||allCs.find(c=>c.properties.writeWithoutResponse)
-        ||allCs.find(c=>c.properties.write)
-        ||null;
-    }catch(e){}
+    for(const id of PRINTER_CHARS){
+      try{
+        const c=await svc.getCharacteristic(id);
+        if(c.properties.write||c.properties.writeWithoutResponse){ch=c;break;}
+      }catch(e){}
+    }
+    // Fallback: scan semua characteristic, pilih yang bisa write
+    if(!ch){
+      try{
+        const cs=await svc.getCharacteristics();
+        ch=cs.find(c=>c.properties.writeWithoutResponse)||cs.find(c=>c.properties.write)||null;
+      }catch(e){}
+    }
     if(!ch)throw new Error('Characteristic write tidak ditemukan.');
 
     btCharacteristic=ch;
