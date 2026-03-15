@@ -2318,20 +2318,47 @@ function updateBtStatus(connected,name=''){
 
 async function connectBluetooth(){
   if(!navigator.bluetooth){toast('Web Bluetooth tidak didukung. Gunakan Chrome/Edge di Android atau desktop.','error');return;}
+
+  const btnC=document.getElementById('btn-bt-connect');
+  const origText=btnC?btnC.textContent:'';
+  if(btnC){btnC.disabled=true;btnC.textContent='🔍 Mencari...';}
+
   try{
-    toast('Mencari printer Bluetooth...','info');
+    // acceptAllDevices agar semua jenis printer thermal bisa terdeteksi
     btDevice=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:PRINTER_SERVICES});
     btDevice.addEventListener('gattserverdisconnected',onBtDisconnected);
-    toast('Menghubungkan ke '+btDevice.name+'...','info');
+
+    if(btnC) btnC.textContent='⚡ Konek...';
     const server=await btDevice.gatt.connect();
+
+    if(btnC) btnC.textContent='🔧 Inisialisasi...';
+    // Cari service secara PARALEL (bukan serial) — jauh lebih cepat
+    const svcResults=await Promise.allSettled(
+      PRINTER_SERVICES.map(id=>server.getPrimaryService(id))
+    );
     let svc=null;
-    for(const id of PRINTER_SERVICES){try{svc=await server.getPrimaryService(id);break;}catch(e){}}
-    if(!svc){try{const ss=await server.getPrimaryServices();if(ss.length)svc=ss[0];}catch(e){}}
+    for(const r of svcResults){if(r.status==='fulfilled'){svc=r.value;break;}}
+    // Fallback: ambil semua service lalu pilih yang pertama
+    if(!svc){
+      try{const ss=await server.getPrimaryServices();if(ss.length)svc=ss[0];}catch(e){}
+    }
     if(!svc)throw new Error('Service printer tidak ditemukan. Pastikan printer ESC/POS.');
+
+    // Cari characteristic secara PARALEL juga
+    const chResults=await Promise.allSettled(
+      PRINTER_CHARS.map(id=>svc.getCharacteristic(id))
+    );
     let ch=null;
-    for(const id of PRINTER_CHARS){try{ch=await svc.getCharacteristic(id);break;}catch(e){}}
-    if(!ch){try{const cs=await svc.getCharacteristics();for(const c of cs){if(c.properties.write||c.properties.writeWithoutResponse){ch=c;break;}}}catch(e){}}
+    for(const r of chResults){if(r.status==='fulfilled'){ch=r.value;break;}}
+    // Fallback: scan semua characteristic, pilih yang bisa write
+    if(!ch){
+      try{
+        const cs=await svc.getCharacteristics();
+        for(const c of cs){if(c.properties.write||c.properties.writeWithoutResponse){ch=c;break;}}
+      }catch(e){}
+    }
     if(!ch)throw new Error('Characteristic write tidak ditemukan.');
+
     btCharacteristic=ch;
     updateBtStatus(true,btDevice.name||'Printer');
     toast('Printer '+btDevice.name+' terhubung!','success');
@@ -2339,6 +2366,8 @@ async function connectBluetooth(){
     btDevice=null;btCharacteristic=null;updateBtStatus(false);
     if(err.name==='NotFoundError')toast('Tidak ada perangkat dipilih.','warn');
     else toast('Gagal terhubung: '+err.message,'error');
+  }finally{
+    if(btnC){btnC.disabled=false;btnC.textContent=btCharacteristic?'🔗 Ganti':origText;}
   }
 }
 
