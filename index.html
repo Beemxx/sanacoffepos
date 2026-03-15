@@ -2469,9 +2469,11 @@ async function printThermal(){
     await doPrintCopy(lastSaleData, 1);
     toast('Rangkap 1 tercetak ✓','success');
 
-    // Tunggu printer selesai memotong kertas (3 detik cukup)
-    btnP.textContent='⏳ Menunggu... (3s)';
-    await new Promise(r=>setTimeout(r,3000));
+    // Tunggu printer selesai memotong kertas sebelum rangkap 2 (8 detik)
+    for(let s=8;s>0;s--){
+      btnP.textContent='⏳ Rangkap 2 dalam '+s+'s...';
+      await new Promise(r=>setTimeout(r,1000));
+    }
 
     btnP.textContent='⏳ Print Rangkap 2/2...';
     await doPrintCopy(lastSaleData, 2);
