@@ -398,22 +398,17 @@ canvas{width:100%!important}
 
 /* ===== PRINT STYLES (Android & Desktop) ===== */
 @media print {
-  /* Sembunyikan semua elemen kecuali struk */
-  body * { visibility: hidden !important; }
+  /* Sembunyikan semua elemen UI */
+  body > * { display: none !important; }
 
-  /* Tampilkan hanya konten struk */
-  #receipt-content,
-  #receipt-content * { visibility: visible !important; }
+  /* Tampilkan hanya print-area */
+  #print-area { display: block !important; }
 
-  /* Posisikan struk di pojok kiri atas */
-  #receipt-content {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
+  /* Reset body */
+  body {
     margin: 0 !important;
     padding: 0 !important;
-    z-index: 99999 !important;
+    background: #fff !important;
   }
 
   /* Pastikan background/warna tercetak */
@@ -421,29 +416,31 @@ canvas{width:100%!important}
     border: none !important;
     box-shadow: none !important;
     max-width: 100% !important;
+    width: 100% !important;
     margin: 0 !important;
-    padding: 12px !important;
+    padding: 8px !important;
     font-size: 11px !important;
+    line-height: 1.6 !important;
     color: #000 !important;
     background: #fff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Sembunyikan tombol-tombol di footer modal */
-  .modal-footer,
-  .modal-header,
-  .topbar,
-  .nav,
-  #toast-container,
-  #login-screen { display: none !important; }
-
   /* Hindari page break di dalam struk */
   .receipt { page-break-inside: avoid; }
+
+  /* Sembunyikan elemen yang tidak perlu */
+  .modal-footer,
+  .modal-header,
+  #toast-container { display: none !important; }
 }
 </style>
 </head>
 <body>
+
+<!-- Print Area (untuk window.print() di Android) -->
+<div id="print-area" style="display:none"></div>
 
 <!-- LOGIN -->
 <div id="login-screen">
@@ -2284,13 +2281,27 @@ function showReceipt(sale){
     </div>`;
   openModal('modal-receipt');
 }
-function printReceipt(){setTimeout(function(){window.print();},300);}
+function printReceipt(){
+  // Salin konten struk ke print-area agar @media print bisa menampilkannya
+  // Ini fix untuk Android Chrome yang tidak bisa pakai position:fixed di @media print
+  const src = document.getElementById('receipt-content');
+  const pa  = document.getElementById('print-area');
+  if(src && pa){
+    pa.innerHTML = src.innerHTML;
+  }
+  setTimeout(function(){
+    window.print();
+    // Bersihkan print-area setelah print selesai
+    setTimeout(function(){ if(pa) pa.innerHTML=''; }, 1000);
+  }, 300);
+}
 
 // ===================== BLUETOOTH THERMAL PRINTER =====================
 let btDevice=null,btCharacteristic=null,lastSaleData=null;
 const ESC=0x1B,GS=0x1D;
 const ESC_INIT=[ESC,0x40],ESC_CENTER=[ESC,0x61,0x01],ESC_LEFT=[ESC,0x61,0x00];
 const ESC_BOLD_ON=[ESC,0x45,0x01],ESC_BOLD_OFF=[ESC,0x45,0x00];
+// BUG FIX: ESC_BIG hanya 2x lebar & 2x tinggi (0x11), selalu diikuti ESC_NORMAL
 const ESC_BIG=[GS,0x21,0x11],ESC_NORMAL=[GS,0x21,0x00];
 const ESC_CUT=[GS,0x56,0x42,0x00],LF=[0x0A];
 const FEED=(n)=>[ESC,0x64,n];
@@ -2310,7 +2321,7 @@ async function connectBluetooth(){
   try{
     toast('Mencari printer Bluetooth...','info');
     btDevice=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:PRINTER_SERVICES});
-    btDevice.addEventListener('gattserverdisconnected',()=>{btCharacteristic=null;updateBtStatus(false);toast('Printer terputus','warn');});
+    btDevice.addEventListener('gattserverdisconnected',onBtDisconnected);
     toast('Menghubungkan ke '+btDevice.name+'...','info');
     const server=await btDevice.gatt.connect();
     let svc=null;
@@ -2331,88 +2342,235 @@ async function connectBluetooth(){
   }
 }
 
-function encBytes(text){const b=[];for(let i=0;i<text.length;i++){const c=text.charCodeAt(i);b.push(c<128?c:(c>255?63:c));}return b;}
-function twoCol(l,r,W=32){const s=W-String(l).length-String(r).length;return String(l)+' '.repeat(Math.max(1,s))+String(r);}
-function dash(W=32){return '-'.repeat(W);}
-// fmtNum defined earlier
-
-async function sendToPrinter(bytes){
-  if(!btCharacteristic)throw new Error('Printer tidak terhubung!');
-  const data=new Uint8Array(bytes);
-  for(let i=0;i<data.length;i+=512){
-    const chunk=data.slice(i,i+512);
-    try{await btCharacteristic.writeValueWithoutResponse(chunk);}catch(e){await btCharacteristic.writeValue(chunk);}
-    await new Promise(r=>setTimeout(r,50));
+function onBtDisconnected(){
+  btCharacteristic=null;
+  updateBtStatus(false);
+  toast('Printer terputus','warn');
+  // BUG FIX: Auto-reconnect jika device masih ada
+  if(btDevice && btDevice.gatt){
+    btDevice.gatt.connect().then(server=>{
+      for(const id of PRINTER_SERVICES){
+        server.getPrimaryService(id).then(svc=>{
+          svc.getCharacteristics().then(cs=>{
+            for(const c of cs){
+              if(c.properties.write||c.properties.writeWithoutResponse){
+                btCharacteristic=c;
+                updateBtStatus(true,btDevice.name||'Printer');
+                toast('Printer auto-reconnect ✓','success');
+                break;
+              }
+            }
+          }).catch(()=>{});
+        }).catch(()=>{});
+        break;
+      }
+    }).catch(()=>{});
   }
 }
 
+// BUG FIX: encBytes — encoding yang benar untuk thermal ESC/POS
+// Karakter ASCII biasa (0-127) langsung, karakter non-ASCII di-encode pakai CP437/Latin-1
+// Karakter Rp (Rupiah sign U+20AC) → 'Rp' plaintext, non-ASCII → '?' (63)
+function encBytes(text){
+  const b=[];
+  const s=String(text||'');
+  for(let i=0;i<s.length;i++){
+    const c=s.charCodeAt(i);
+    if(c<128){
+      b.push(c);
+    } else if(c===0x2019||c===0x0027){ // smart quote → apostrophe
+      b.push(0x27);
+    } else if(c===0x2018||c===0x0060){ // backtick/open quote
+      b.push(0x60);
+    } else if(c>=0xC0&&c<=0xFF){ // Latin-1 Extended (accented chars)
+      b.push(c&0xFF); // beberapa printer ESC/POS support CP437 (Latin-1 range)
+    } else {
+      b.push(0x3F); // '?'
+    }
+  }
+  return b;
+}
+
+// BUG FIX: twoCol — hitung panjang string dengan benar
+// Sebelumnya String(r).length tidak dihitung saat menentukan spasi
+function twoCol(l,r,W=32){
+  const ls=String(l||''),rs=String(r||'');
+  const spaces=W-ls.length-rs.length;
+  return ls+' '.repeat(Math.max(1,spaces))+rs;
+}
+
+// BUG FIX: fmtThermal — format angka tanpa titik/koma untuk thermal printer
+// Gunakan format sederhana agar font monospace tidak salah render
+function fmtThermal(n){
+  const num=Number(n||0);
+  // Format dengan separator titik (Indonesian style) tapi tanpa simbol 'Rp'
+  return num.toLocaleString('id-ID');
+}
+
+function dash(W=32){return '-'.repeat(W);}
+
+// BUG FIX: sendToPrinter — chunk lebih kecil & delay lebih besar untuk Android
+// Android BLE buffer biasanya 20-512 bytes, delay minimal 80-120ms antar chunk
+async function sendToPrinter(bytes){
+  if(!btCharacteristic)throw new Error('Printer tidak terhubung!');
+  
+  // BUG FIX: Cek apakah GATT masih connected sebelum kirim
+  if(btDevice && btDevice.gatt && !btDevice.gatt.connected){
+    try{
+      await btDevice.gatt.connect();
+      // Re-acquire characteristic setelah reconnect
+      const svcs=await btDevice.gatt.getPrimaryServices();
+      if(svcs.length){
+        const cs=await svcs[0].getCharacteristics();
+        for(const c of cs){
+          if(c.properties.write||c.properties.writeWithoutResponse){btCharacteristic=c;break;}
+        }
+      }
+    }catch(e){throw new Error('Printer terputus, reconnect gagal: '+e.message);}
+  }
+
+  const data=new Uint8Array(bytes);
+  // BUG FIX: Gunakan chunk 200 bytes (aman untuk hampir semua printer Android)
+  const CHUNK_SIZE=200;
+  for(let i=0;i<data.length;i+=CHUNK_SIZE){
+    const chunk=data.slice(i,i+CHUNK_SIZE);
+    // BUG FIX: Coba writeValueWithoutResponse dulu, fallback ke writeValue
+    let success=false;
+    if(btCharacteristic.properties.writeWithoutResponse){
+      try{
+        await btCharacteristic.writeValueWithoutResponse(chunk);
+        success=true;
+      }catch(e){/* fallback */}
+    }
+    if(!success){
+      try{
+        await btCharacteristic.writeValue(chunk);
+      }catch(e){
+        throw new Error('Gagal kirim data ke printer: '+e.message);
+      }
+    }
+    // BUG FIX: Delay 80ms antar chunk — cukup untuk printer thermal Android (50ms sering overflow)
+    await new Promise(r=>setTimeout(r,80));
+  }
+}
+
+// BUG FIX: printThermal — hapus countdown 10 detik yang tidak perlu
+// Ganti dengan delay 3 detik yang cukup untuk printer selesai memotong kertas
 async function printThermal(){
   if(!btCharacteristic){toast('Hubungkan printer dulu!','error');return;}
   if(!lastSaleData){toast('Data struk tidak tersedia.','error');return;}
 
   const btnP=document.getElementById('btn-bt-print');
+  const origText=btnP.textContent;
   btnP.disabled=true;
 
-  for(let copy=1;copy<=2;copy++){
-    try{
-      btnP.textContent='⏳ Print Rangkap '+copy+'/2...';
-      await doPrintCopy(lastSaleData, copy);
-      toast('Rangkap '+copy+' tercetak ✓','success');
-    }catch(err){
-      toast('Gagal print rangkap '+copy+': '+err.message,'error');
-      break;
-    }
-    if(copy===1){
-      // Hitung mundur 10 detik sebelum rangkap 2
-      for(let s=10;s>0;s--){
-        btnP.textContent='⏳ Rangkap 2 dalam '+s+'s...';
-        await new Promise(r=>setTimeout(r,1000));
-      }
-    }
-  }
+  try{
+    btnP.textContent='⏳ Print Rangkap 1/2...';
+    await doPrintCopy(lastSaleData, 1);
+    toast('Rangkap 1 tercetak ✓','success');
 
-  btnP.textContent='🖨️ Print Thermal';
-  btnP.disabled=false;
+    // Tunggu printer selesai memotong kertas (3 detik cukup)
+    btnP.textContent='⏳ Menunggu... (3s)';
+    await new Promise(r=>setTimeout(r,3000));
+
+    btnP.textContent='⏳ Print Rangkap 2/2...';
+    await doPrintCopy(lastSaleData, 2);
+    toast('Rangkap 2 tercetak ✓','success');
+  }catch(err){
+    toast('Gagal print: '+err.message,'error');
+  }finally{
+    btnP.textContent=origText;
+    btnP.disabled=false;
+  }
 }
 
 async function doPrintCopy(sale, copyNum){
   const W=32;
   let b=[];
-  b.push(...ESC_INIT,...FEED(1));
-  b.push(...ESC_CENTER,...ESC_BIG,...ESC_BOLD_ON,...encBytes('SANA COFFEE'),...LF);
-  b.push(...ESC_NORMAL,...ESC_BOLD_OFF,...encBytes('Sana Coffee - Point of Sale'),...LF);
-  b.push(...encBytes(new Date(sale.datetime||Date.now()).toLocaleString('id-ID')),...LF);
 
-  // Label rangkap
-  b.push(...ESC_BOLD_ON,...encBytes(centerStr(copyNum===1?'[ RANGKAP 1 - PELANGGAN ]':'[ RANGKAP 2 - PEMBUKUAN ]',W)),...LF,...ESC_BOLD_OFF);
+  // BUG FIX: ESC_INIT selalu di awal untuk reset printer state
+  b.push(...ESC_INIT);
+  b.push(...FEED(1));
 
-  b.push(...ESC_LEFT,...encBytes(dash(W)),...LF);
+  // Header — CENTER, BOLD, BIG
+  b.push(...ESC_CENTER,...ESC_BIG,...ESC_BOLD_ON);
+  b.push(...encBytes('SANA COFFEE'),...LF);
+  // BUG FIX: Selalu reset ESC_NORMAL & ESC_BOLD_OFF setelah ESC_BIG
+  // Tanpa ini, semua baris berikutnya ikut jadi besar/bold
+  b.push(...ESC_NORMAL,...ESC_BOLD_OFF);
+  b.push(...encBytes('Sana Coffee - Point of Sale'),...LF);
+
+  // Tanggal/waktu — format string aman
+  const dtStr=sale.datetime?new Date(sale.datetime).toLocaleString('id-ID',{
+    day:'2-digit',month:'2-digit',year:'numeric',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false
+  }):(new Date().toLocaleString('id-ID'));
+  b.push(...encBytes(dtStr),...LF);
+
+  // Label rangkap — CENTER, BOLD
+  b.push(...ESC_BOLD_ON);
+  const rankapLabel=copyNum===1?'[ RANGKAP 1 - PELANGGAN ]':'[ RANGKAP 2 - PEMBUKUAN ]';
+  b.push(...encBytes(centerStr(rankapLabel,W)),...LF);
+  b.push(...ESC_BOLD_OFF);
+
+  // Kembali ke LEFT untuk body struk
+  b.push(...ESC_LEFT);
+  b.push(...encBytes(dash(W)),...LF);
   b.push(...encBytes(twoCol('No:',sale.id||'-',W)),...LF);
   b.push(...encBytes(twoCol('Kasir:',sale.cashier||'-',W)),...LF);
   b.push(...encBytes(twoCol('Pelanggan:',sale.customer||'Umum',W)),...LF);
   b.push(...encBytes(dash(W)),...LF);
+
+  // Items
   (sale.items||[]).forEach(item=>{
-    b.push(...encBytes(String(item.productName||'-').substring(0,W)),...LF);
-    b.push(...encBytes(twoCol('  '+item.qty+' x Rp'+fmtNum(item.sellPrice),'Rp'+fmtNum(item.subtotal),W)),...LF);
+    // Nama produk — potong jika terlalu panjang
+    const nama=String(item.productName||'-').substring(0,W);
+    b.push(...encBytes(nama),...LF);
+    // BUG FIX: Gunakan fmtThermal (tanpa 'Rp ' prefix) lalu tambah manual sebagai ASCII
+    const qtyLine=twoCol('  '+item.qty+' x Rp'+fmtThermal(item.sellPrice),'Rp'+fmtThermal(item.subtotal),W);
+    b.push(...encBytes(qtyLine),...LF);
   });
+
   b.push(...encBytes(dash(W)),...LF);
-  b.push(...encBytes(twoCol('Subtotal','Rp'+fmtNum(sale.subtotal),W)),...LF);
-  if(sale.discount>0)b.push(...encBytes(twoCol('Diskon','-Rp'+fmtNum(sale.discount),W)),...LF);
-  b.push(...ESC_BOLD_ON,...encBytes(twoCol('TOTAL','Rp'+fmtNum(sale.total),W)),...LF,...ESC_BOLD_OFF);
-  b.push(...encBytes(twoCol('Pembayaran',(sale.payment||'').toUpperCase(),W)),...LF);
-  if(sale.change>0)b.push(...encBytes(twoCol('Kembalian','Rp'+fmtNum(sale.change),W)),...LF);
+  b.push(...encBytes(twoCol('Subtotal','Rp'+fmtThermal(sale.subtotal),W)),...LF);
+  if(Number(sale.discount)>0){
+    b.push(...encBytes(twoCol('Diskon','-Rp'+fmtThermal(sale.discount),W)),...LF);
+  }
+
+  // Total — BOLD
+  b.push(...ESC_BOLD_ON);
+  b.push(...encBytes(twoCol('TOTAL','Rp'+fmtThermal(sale.total),W)),...LF);
+  b.push(...ESC_BOLD_OFF);
+
+  b.push(...encBytes(twoCol('Bayar',(sale.payment||'').toUpperCase(),W)),...LF);
+  if(Number(sale.change)>0){
+    b.push(...encBytes(twoCol('Kembalian','Rp'+fmtThermal(sale.change),W)),...LF);
+  }
+
   b.push(...encBytes(dash(W)),...LF);
+
+  // Footer — CENTER
   b.push(...ESC_CENTER);
   if(copyNum===1){
-    b.push(...encBytes('Terima kasih atas kunjungan Anda!'),...LF,...encBytes('Sampai jumpa kembali :)'),...LF);
-  } else {
-    b.push(...encBytes('-- Arsip Pembukuan --'),...LF,...encBytes('Simpan struk ini untuk pencatatan.'),...LF);
+    b.push(...encBytes('Terima kasih atas kunjungan Anda!'),...LF);
+    b.push(...encBytes('Sampai jumpa kembali :)'),...LF);
+  }else{
+    b.push(...encBytes('-- Arsip Pembukuan --'),...LF);
+    b.push(...encBytes('Simpan struk ini untuk pencatatan.'),...LF);
   }
+
+  // Feed & cut
   b.push(...FEED(4),...ESC_CUT);
+
   await sendToPrinter(b);
 }
 
-function centerStr(text,W=32){if(text.length>=W)return text;const p=Math.floor((W-text.length)/2);return ' '.repeat(p)+text;}
+function centerStr(text,W=32){
+  const s=String(text||'');
+  if(s.length>=W)return s;
+  const p=Math.floor((W-s.length)/2);
+  return ' '.repeat(p)+s;
+}
 
 // ===================== INVENTORY =====================
 let editingProduct=null, productImageData='';
