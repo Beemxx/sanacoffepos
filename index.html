@@ -189,6 +189,15 @@ tbody tr:hover{background:var(--surface2)}
 .stock-progress{background:var(--surface2);border-radius:4px;height:6px;overflow:hidden;margin-top:4px}
 .stock-progress-fill{height:100%;border-radius:4px;transition:width .3s}
 .stock-ok{background:var(--accent3)}
+.ats-bb-empty{display:inline-flex;align-items:center;font-size:10px;font-weight:600;color:#8a2010;background:#fde8e4;border:1px solid #f0b0a0;border-radius:4px;padding:2px 7px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ats-out-box{background:#fff0ee;border:1.5px solid #f0a090;border-radius:6px;padding:6px 8px;margin-top:4px;width:100%}
+.ats-out-title{font-size:10px;font-weight:700;color:#8a2010;margin-bottom:4px;letter-spacing:.2px}
+.ats-bb-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:3px}
+.ats-bb-row:last-child{margin-bottom:0}
+.ats-bb-name{font-size:10px;font-weight:700;color:#8a2010;flex-shrink:0}
+.ats-bb-detail{font-size:9px;color:#b04030;font-family:'JetBrains Mono',monospace;flex:1}
+.ats-restock-btn{font-size:9px;font-weight:700;color:#fff;background:#c8402a;border-radius:3px;padding:1px 6px;cursor:pointer;flex-shrink:0;transition:background .15s}
+.ats-restock-btn:hover{background:#a8321e}
 .stock-low{background:var(--warn)}
 .stock-out{background:var(--accent)}
 .admin-only{display:none}
@@ -393,6 +402,25 @@ canvas{width:100%!important}
 .exp-breakdown-label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3);font-weight:600}
 .exp-breakdown-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-top:4px}
 
+/* QUICK CASH BUTTONS */
+.quick-cash-wrap{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.quick-cash-btn{
+  flex:1 1 calc(33.33% - 4px);min-width:0;
+  padding:6px 4px;
+  background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:7px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;
+  color:var(--ink2);cursor:pointer;text-align:center;
+  transition:background .15s,border-color .15s,transform .1s;
+  user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.quick-cash-btn:hover{background:var(--surface3);border-color:var(--accent2);color:var(--accent2)}
+.quick-cash-btn:active{transform:scale(.95)}
+.quick-cash-btn.active-nom{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.quick-cash-clear{flex:1 1 100%!important;background:#fde8e4!important;border-color:#f0a090!important;color:var(--accent)!important;font-weight:700!important}
+.quick-cash-clear:hover{background:#fdd0c8!important;border-color:var(--accent)!important}
+.quick-cash-total{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent2);font-weight:700;text-align:right;margin-bottom:4px;min-height:16px}
+
 /* number format helper visual */
 .currency::before{content:'Rp '}
 
@@ -574,8 +602,21 @@ canvas{width:100%!important}
               <div class="pay-btn" onclick="setPayment('qris')" id="pay-qris">📱 QRIS</div>
             </div>
             <div id="cash-input-wrap" style="margin-bottom:10px;display:block">
-              <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3);display:block;margin-bottom:4px">Uang Diterima</label>
-              <input class="input" type="number" id="cash-input" placeholder="Masukkan nominal uang..." oninput="updateChange()">
+              <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3);display:block;margin-bottom:6px">Uang Diterima</label>
+              <div class="quick-cash-total" id="quick-cash-total"></div>
+              <div class="quick-cash-wrap" id="quick-cash-wrap">
+                <button class="quick-cash-btn" onclick="quickCash(1000)" data-nom="1000">+1.000</button>
+                <button class="quick-cash-btn" onclick="quickCash(2000)" data-nom="2000">+2.000</button>
+                <button class="quick-cash-btn" onclick="quickCash(5000)" data-nom="5000">+5.000</button>
+                <button class="quick-cash-btn" onclick="quickCash(8000)" data-nom="8000">+8.000</button>
+                <button class="quick-cash-btn" onclick="quickCash(18000)" data-nom="18000">+18.000</button>
+                <button class="quick-cash-btn" onclick="quickCash(20000)" data-nom="20000">+20.000</button>
+                <button class="quick-cash-btn" onclick="quickCash(23000)" data-nom="23000">+23.000</button>
+                <button class="quick-cash-btn" onclick="quickCash(50000)" data-nom="50000">+50.000</button>
+                <button class="quick-cash-btn" onclick="quickCash(100000)" data-nom="100000">+100.000</button>
+                <button class="quick-cash-btn quick-cash-clear" onclick="clearQuickCash()" id="btn-quick-clear" style="display:none">🗑 Kosongkan</button>
+              </div>
+              <input class="input" type="number" id="cash-input" placeholder="Masukkan nominal uang..." oninput="syncQuickCashHighlight();updateChange()">
               <div id="change-display" style="margin-top:8px;min-height:40px"></div>
             </div>
             <button class="checkout-btn" onclick="checkout()" id="checkout-btn" disabled>PROSES PEMBAYARAN</button>
@@ -1516,6 +1557,7 @@ canvas{width:100%!important}
 <script>
 // ===================== FIREBASE CONFIG =====================
 let db = null;
+let strukCfg = { nama_toko:"SANA COFFEE", tagline:"Sana Coffee · Point of Sale", alamat:"", telp:"", header_custom:"", footer_custom:"Terima kasih atas kunjungan Anda!", delay_rangkap2:8 };
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCXE3Tku13k2fI-CVjMjVarvZtUwWoTigI",
@@ -1537,8 +1579,27 @@ function initFirebase(){
   }
 }
 
+// ── Load Pengaturan Struk dari Firestore ──
+async function loadStrukSettings(){
+  try {
+    const snap = await db.collection('settings').doc('struk').get();
+    if(snap.exists){
+      const d = snap.data();
+      strukCfg = {
+        nama_toko:    d.nama_toko    || strukCfg.nama_toko,
+        tagline:      d.tagline      !== undefined ? d.tagline      : strukCfg.tagline,
+        alamat:       d.alamat       || '',
+        telp:         d.telp         || '',
+        header_custom:d.header_custom|| '',
+        footer_custom:d.footer_custom|| strukCfg.footer_custom,
+        delay_rangkap2: (d.delay_rangkap2 !== undefined && d.delay_rangkap2 !== null) ? Number(d.delay_rangkap2) : 8
+      };
+    }
+  } catch(e){ console.warn('Struk settings tidak bisa dimuat:', e.message); }
+}
+
 // Cache lokal
-const cache = { products:[], sales:[], purchases:[], opname:[], bahanbaku:[], resep:{}, kalibrasi:[] };
+const cache = { products:[], sales:[], purchases:[], opname:[], bahanbaku:[], resep:{}, kalibrasi:[], expenses:[] };
 
 // ===================== API LAYER (Firebase Firestore) =====================
 async function api(action, payload={}) {
@@ -1557,8 +1618,9 @@ async function api(action, payload={}) {
       return {success:true, data: snap.docs.map(d=>d.data())};
     }
     case 'saveProduct': {
+      const isUpdate = !!(await db.collection('products').doc(payload.product.id).get()).exists;
       await db.collection('products').doc(payload.product.id).set(payload.product);
-      return {success:true, action:'saved'};
+      return {success:true, action: isUpdate ? 'updated' : 'added'};
     }
     case 'deleteProduct': {
       await db.collection('products').doc(payload.id).delete();
@@ -1572,11 +1634,17 @@ async function api(action, payload={}) {
     case 'saveSale': {
       const s = payload.sale;
       await db.collection('sales').doc(s.id).set(s);
+      // Hanya update stock produk yang TIDAK punya resep (hasResep=false)
+      // Produk berresep: stoknya dikontrol oleh BB, bukan p.stock
       const batch = db.batch();
+      let hasBatchOp = false;
       for(const item of (s.items||[])){
-        batch.update(db.collection('products').doc(item.productId), {stock: item.newStock});
+        if(!item.hasResep){
+          batch.update(db.collection('products').doc(item.productId), {stock: item.newStock});
+          hasBatchOp = true;
+        }
       }
-      await batch.commit();
+      if(hasBatchOp) await batch.commit();
       return {success:true};
     }
     case 'getPurchases': {
@@ -1763,7 +1831,7 @@ async function doLogin(){
       startClock();
       // Muat semua data dulu, BARU render dashboard
       showLoading('Memuat data...');
-      await loadAllData(true);
+      await Promise.all([loadAllData(true), loadStrukSettings()]);
       loadBahanBakuLocal();
       hideLoading();
       // Aktifkan halaman dashboard
@@ -1791,7 +1859,14 @@ function showLoginError(msg){
 }
 function doLogout(){
   currentUser=null;
+  // Reset semua cache data
   cache.products=[]; cache.sales=[]; cache.purchases=[]; cache.opname=[]; cache.bahanbaku=[]; cache.resep={}; cache.expenses=[]; cache.kalibrasi=[];
+  // Reset state UI yang bisa bocor ke sesi berikutnya
+  cart=[]; selectedPayment='tunai'; posCategory='';
+  if(chartSales){chartSales.destroy();chartSales=null;}
+  if(bepChart){bepChart.destroy();bepChart=null;}
+  // Putus koneksi Bluetooth jika ada
+  if(btDevice){try{btDevice.gatt.disconnect();}catch(e){} btDevice=null; btCharacteristic=null;}
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-user').value='';
@@ -1902,12 +1977,33 @@ async function showPage(p){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
-  const pages=['dashboard','pos','inventory','purchase','opname','laporan','neraca'];
-  const idx=pages.indexOf(p);
-  if(idx>=0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
-  if(p==='bahanbaku') document.getElementById('nav-bahanbaku').classList.add('active');
-  if(p==='expense') document.getElementById('nav-expense').classList.add('active');
-  if(p==='kalibrasi') document.getElementById('nav-kalibrasi').classList.add('active');
+  // Hanya set active untuk nav-item yang punya ID eksplisit di pages standar
+  // nav bahanbaku, expense, kalibrasi menggunakan ID element langsung
+  const pageToNavId = {
+    dashboard : null,   // akan diambil via querySelectorAll index 0
+    pos       : null,
+    inventory : null,
+    purchase  : null,
+    opname    : null,
+    laporan   : null,
+    bahanbaku : 'nav-bahanbaku',
+    expense   : 'nav-expense',
+    kalibrasi : 'nav-kalibrasi',
+  };
+  // neraca tidak punya nav-item tersendiri di HTML (bisa admin-only hidden),
+  // fallback ke index-based jika ada
+  if(pageToNavId[p] !== undefined && pageToNavId[p] !== null){
+    const navEl = document.getElementById(pageToNavId[p]);
+    if(navEl) navEl.classList.add('active');
+  } else {
+    // Pages standar: dashboard=0, pos=1, inventory=2, purchase=3, opname=4, laporan=5
+    const stdPages=['dashboard','pos','inventory','purchase','opname','laporan','neraca'];
+    const idx=stdPages.indexOf(p);
+    if(idx>=0){
+      const navItems=document.querySelectorAll('.nav-item');
+      if(navItems[idx]) navItems[idx].classList.add('active');
+    }
+  }
 
   // Render dari cache langsung (instan) — klik Refresh jika mau data terbaru
   if(p==='dashboard') renderDashboard();
@@ -1962,8 +2058,22 @@ function renderDashboard(){
   const todaySales=sales.filter(s=>getSaleLocalDate(s)===todayStr);
   const todayRevenue=todaySales.reduce((a,s)=>a+Number(s.total||0),0);
   const todayHPP=todaySales.reduce((a,s)=>a+(s.items||[]).reduce((b,i)=>b+(Number(i.buyPrice)||0)*(Number(i.qty)||0),0),0);
-  const lowStock=products.filter(p=>Number(p.stock)>0&&Number(p.stock)<=Number(p.minStock));
-  const outStock=products.filter(p=>Number(p.stock)===0);
+  // Gunakan ATS untuk menentukan status stok produk berresep
+  const bbReady = cache.bahanbaku && cache.bahanbaku.length > 0;
+  const atsMapDash = bbReady ? calcAllATS() : {};
+  function dashStatus(p){
+    const ats = atsMapDash[p.id] !== undefined ? atsMapDash[p.id] : null;
+    if(ats !== null){
+      if(ats.cups === 0) return 'out';
+      if(ats.cups <= 5)  return 'low';
+      return 'ok';
+    }
+    if(Number(p.stock) === 0) return 'out';
+    if(Number(p.stock) > 0 && Number(p.stock) <= Number(p.minStock)) return 'low';
+    return 'ok';
+  }
+  const lowStock=products.filter(p=>dashStatus(p)==='low');
+  const outStock=products.filter(p=>dashStatus(p)==='out');
 
   document.getElementById('dash-stats').innerHTML=`
     <div class="stat-card" data-icon="💰"><div class="stat-label">Pendapatan Hari Ini</div><div class="stat-value green">${fmt(todayRevenue)}</div><div class="stat-sub">${todaySales.length} transaksi</div></div>
@@ -1980,7 +2090,8 @@ function renderDashboard(){
   const labels=[],dataRev=[],dataProfit=[];
   for(let i=6;i>=0;i--){
     const d=new Date();d.setDate(d.getDate()-i);
-    const ds=d.toISOString().slice(0,10);
+    // Gunakan tanggal lokal (bukan UTC) agar konsisten dengan getSaleLocalDate & today()
+    const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     labels.push(d.toLocaleDateString('id-ID',{weekday:'short',day:'numeric'}));
     const dSales=sales.filter(s=>getSaleLocalDate(s)===ds);
     const rev=dSales.reduce((a,s)=>a+Number(s.total||0),0);
@@ -2022,11 +2133,24 @@ function renderDashboard(){
 
   // Low stock list
   document.getElementById('low-stock-list').innerHTML=[...outStock,...lowStock].slice(0,8).length?
-    [...outStock,...lowStock].slice(0,8).map(p=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div><div style="font-size:13px;font-weight:500">${p.name}</div><div style="font-size:11px;color:var(--ink3)">${p.category}</div></div>
-      <span class="tag ${p.stock===0?'tag-red':'tag-yellow'}">${p.stock===0?'HABIS':p.stock+' '+p.unit}</span>
-    </div>`).join(''):'<div style="color:var(--accent3);font-size:13px;padding:16px 0">✓ Semua stok aman</div>';
+    [...outStock,...lowStock].slice(0,8).map(p=>{
+      const ats = atsMapDash[p.id] !== undefined ? atsMapDash[p.id] : null;
+      const hasResep = ats !== null;
+      const st = dashStatus(p);
+      let stokLabel = '';
+      if(hasResep && st==='out'){
+        const emptyNames = (ats.emptyBBList||[]).map(b=>b.name).join(', ')||ats.limitingBB||'BB habis';
+        stokLabel = `<div><span class="tag tag-red">BB HABIS</span><div style="font-size:10px;color:var(--accent);margin-top:2px">⚠️ ${emptyNames}</div></div>`;
+      } else if(hasResep){
+        stokLabel = `<span class="tag tag-yellow">~${ats.cups} cup</span>`;
+      } else {
+        stokLabel = `<span class="tag ${st==='out'?'tag-red':'tag-yellow'}">${st==='out'?'HABIS':p.stock+' '+p.unit}</span>`;
+      }
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div><div style="font-size:13px;font-weight:500">${p.name}</div><div style="font-size:11px;color:var(--ink3)">${p.category}</div></div>
+        ${stokLabel}
+      </div>`;
+    }).join(''):'<div style="color:var(--accent3);font-size:13px;padding:16px 0">✓ Semua stok aman</div>';
 }
 
 // ===================== POS =====================
@@ -2054,21 +2178,73 @@ function filterPOS(){
     return matchCat&&matchQ;
   });
 
+  // Refresh BB dari Firestore dulu, lalu hitung ATS (async)
+  refreshBBThenRenderPOS(products, q);
+}
+
+async function refreshBBThenRenderPOS(products, q){
+  // Selalu ambil data BB terbaru dari Firestore agar ATS akurat
+  // BUG FIX: Gunakan flag bbLoaded untuk tracking status load
+  let bbLoaded = cache.bahanbaku && cache.bahanbaku.length > 0;
+  try {
+    const freshBB = await api('getBahanBaku');
+    if(freshBB.success && freshBB.data) {
+      cache.bahanbaku = freshBB.data;
+      saveBahanBakuLocal();
+      bbLoaded = true;
+    }
+  } catch(e){ /* pakai cache yang ada */ }
+
   // Pre-compute ATS for all products (1 pass)
-  const atsMap = calcAllATS();
+  // BUG FIX: Jika BB belum loaded sama sekali, calcAllATS akan return null untuk semua produk
+  const atsMap = bbLoaded ? calcAllATS() : {};
 
   document.getElementById('pos-product-grid').innerHTML=products.length?products.map(p=>{
-    const ats       = atsMap[p.id];                          // null = no recipe
+    const ats       = atsMap[p.id] !== undefined ? atsMap[p.id] : null; // null = no recipe / BB not loaded
     const atsZero   = ats !== null && ats.cups === 0;        // recipe exists but BB = 0
     const atsLow    = ats !== null && ats.cups > 0 && ats.cups <= 5;
-    const isOut     = p.stock <= 0 || atsZero;
-    const isLow     = !isOut && (p.stock > 0 && p.stock <= p.minStock || atsLow);
+
+    // BUG FIX: Hanya blokir produk sebagai "out" karena ATS jika BB sudah loaded dengan lengkap
+    // Jika atsZero tapi missingBB > 0, artinya ada data BB yang hilang dari cache — jangan blokir
+    const atsConfirmedZero = atsZero && bbLoaded;
+
+    // BUG FIX UTAMA: Jika produk punya resep (ats !== null), ketersediaan ditentukan dari ATS,
+    // BUKAN dari p.stock. p.stock bisa 0 karena tidak diisi manual, tapi BB masih banyak.
+    // Jika tidak ada resep (ats === null), gunakan p.stock seperti biasa.
+    const hasResep = ats !== null;
+    const isOut = hasResep
+      ? atsConfirmedZero                          // punya resep → habis hanya jika BB habis
+      : p.stock <= 0;                             // tidak ada resep → pakai stok produk
+    const isLow = !isOut && (
+      hasResep
+        ? atsLow                                  // punya resep → low hanya dari ATS
+        : (p.stock > 0 && p.stock <= p.minStock) // tidak ada resep → dari stok produk
+    );
 
     // ATS indicator line
     let atsHtml = '';
     if (ats !== null) {
       if (atsZero) {
-        atsHtml = `<div class="ats-indicator ats-out">🧪 Bahan habis</div>`;
+        // Tampilkan daftar BB yang habis — lengkap dengan info stok & tombol restock
+        const emptyList = (ats.emptyBBList || []);
+        const emptyRows = emptyList.length
+          ? emptyList.map(b => {
+              const bbObj = cache.bahanbaku.find(x=>x.name===b.name);
+              const bbId  = bbObj ? bbObj.id : '';
+              const restockBtn = bbId
+                ? `<span class="ats-restock-btn" onclick="event.stopPropagation();openRestockBB('${bbId}')">+ Restock</span>`
+                : '';
+              return `<div class="ats-bb-row">
+                <span class="ats-bb-name">⚠️ ${b.name}</span>
+                <span class="ats-bb-detail">perlu ${b.need}${b.unit}/cup · stok: ${b.stock}${b.unit}</span>
+                ${restockBtn}
+              </div>`;
+            }).join('')
+          : `<div class="ats-bb-row"><span class="ats-bb-name">⚠️ ${ats.limitingBB||'cek resep'}</span></div>`;
+        atsHtml = `<div class="ats-out-box">
+          <div class="ats-out-title">🧪 Bahan habis — tidak bisa dibuat</div>
+          ${emptyRows}
+        </div>`;
       } else if (atsLow) {
         atsHtml = `<div class="ats-indicator ats-low">🧪 ~${ats.cups} cup tersisa</div>`;
       } else {
@@ -2076,40 +2252,64 @@ function filterPOS(){
       }
     }
 
+    // Buat pesan toast yang menyebut nama BB yang habis
+    const emptyNames = (ats && ats.emptyBBList && ats.emptyBBList.length)
+      ? ats.emptyBBList.map(b=>b.name).join(', ')
+      : (ats && ats.limitingBB ? ats.limitingBB : 'cek resep');
     const clickAction = isOut
-      ? (atsZero ? `toast('Bahan baku habis — tidak bisa membuat ${p.name}!','error')` : `toast('Stok habis!','error')`)
+      ? (atsConfirmedZero ? `toast('Habis: ${emptyNames.replace(/'/g,"\'")}','error')` : `toast('Stok habis!','error')`)
       : `addToCart('${p.id}')`;
 
     return `<div class="prod-card ${isOut?'out':isLow?'low':''}" onclick="${clickAction}" title="${p.name}">
       ${p.image?`<img class="prod-img" src="${p.image}" alt="${p.name}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`:''} 
       <div class="prod-img-placeholder" style="${p.image?'display:none':''}">🛍️</div>
-      ${atsZero?'<span class="prod-badge prod-badge-out">BB HABIS</span>':isOut?'<span class="prod-badge prod-badge-out">HABIS</span>':isLow?`<span class="prod-badge prod-badge-low">SISA ${p.stock}</span>`:''}
+      ${atsConfirmedZero?'<span class="prod-badge prod-badge-out">BB HABIS</span>':isOut?'<span class="prod-badge prod-badge-out">HABIS</span>':isLow?`<span class="prod-badge prod-badge-low">${hasResep?'SISA ~'+(ats?ats.cups:0)+' cup':'SISA '+p.stock}</span>`:''}
       <div class="prod-info">
         <div class="prod-name">${p.name}</div>
         <div class="prod-price">${fmt(p.sellPrice)}</div>
-        <div class="prod-stock ${isOut?'out':isLow?'low':''}">${isOut?'Stok Habis':isLow?'Stok Menipis: '+p.stock:' Stok: '+p.stock+' '+p.unit}</div>
+        <div class="prod-stock ${isOut?'out':isLow?'low':''}">${isOut?(hasResep?'BB Habis':'Stok Habis'):isLow?(hasResep?'BB Menipis':('Stok Menipis: '+p.stock)):('Stok: '+p.stock+' '+p.unit)}</div>
+        ${!hasResep?'<div class="ats-indicator" style="background:var(--surface2);color:var(--ink3);font-size:10px;padding:3px 6px;border-radius:4px;margin-top:3px">📦 stok manual</div>':''}
         ${atsHtml}
       </div></div>`;
   }).join(''):'<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🔍</div><div class="empty-state-text">Produk tidak ditemukan</div></div>';
 }
+// Refresh tampilan POS jika halaman kasir sedang aktif (dipanggil setelah BB berubah)
+function refreshPOSIfActive(){
+  const activePage = document.querySelector('.page.active');
+  if(activePage && activePage.id === 'page-pos'){
+    filterPOS();
+  }
+}
+
 function addToCart(pid){
   const p=getProducts().find(x=>x.id===pid);
-  if(!p||p.stock<=0) return;
-  // Block if ATS = 0 (recipe exists but BB exhausted)
+  if(!p) return;
+  // BUG FIX UTAMA: Jika produk punya resep, jangan blokir hanya karena p.stock <= 0
+  // p.stock bisa 0 karena tidak diisi manual, tapi BB masih banyak.
   const ats = calcATS(pid);
-  if(ats !== null && ats.cups === 0){
+  const hasResep = ats !== null;
+  if(!hasResep && p.stock <= 0){
+    toast('Stok habis!','error');
+    return;
+  }
+  // BUG FIX: Block hanya jika ATS = 0 DAN BB sudah loaded (bukan karena data cache belum lengkap)
+  if(hasResep && ats.cups === 0 && cache.bahanbaku && cache.bahanbaku.length > 0){
     toast(`Bahan baku untuk ${p.name} habis (${ats.limitingBB||'cek resep'})!`,'error');
     return;
   }
   const existing=cart.find(c=>c.id===pid);
   if(existing){
-    // Also check ATS vs qty in cart
-    if(ats !== null && existing.qty >= ats.cups){
-      toast(`Bahan baku hanya cukup untuk ${ats.cups} cup ${p.name}!`,'warn');
-      return;
+    if(hasResep){
+      // Produk berresep: batas dari ATS
+      if(ats.cups > 0 && existing.qty >= ats.cups){
+        toast(`Bahan baku hanya cukup untuk ${ats.cups} cup ${p.name}!`,'warn');
+        return;
+      }
+    } else {
+      // Produk manual: batas dari p.stock
+      if(existing.qty >= p.stock){ toast('Stok tidak cukup!','error'); return; }
     }
-    if(existing.qty>=p.stock){toast('Stok tidak cukup!','error');return;}
-    existing.qty++;existing.subtotal=existing.qty*existing.price;
+    existing.qty++; existing.subtotal=existing.qty*existing.price;
   }
   else cart.push({id:pid,name:p.name,price:p.sellPrice,buyPrice:p.buyPrice,qty:1,subtotal:p.sellPrice,unit:p.unit});
   renderCart();updateCartTotals();
@@ -2119,7 +2319,17 @@ function changeQty(id,delta){
   const item=cart.find(c=>c.id===id);
   if(!item) return;
   item.qty+=delta;
-  if(delta>0&&item.qty>p.stock){item.qty--;toast('Stok tidak cukup!','error');return;}
+  // BUG FIX: Jika produk punya resep, batas qty dari ATS bukan p.stock
+  if(delta>0){
+    const ats=calcATS(id);
+    const hasResep=ats!==null;
+    if(hasResep && ats.cups>0 && item.qty>ats.cups){item.qty--;toast('Bahan baku hanya cukup untuk '+ats.cups+' cup!','warn');return;}
+    // Guard: p bisa null jika produk dihapus dari inventori tapi masih ada di cart
+    if(!hasResep){
+      if(!p){item.qty--;toast('Produk tidak ditemukan!','error');return;}
+      if(item.qty>p.stock){item.qty--;toast('Stok tidak cukup!','error');return;}
+    }
+  }
   if(item.qty<=0) cart=cart.filter(c=>c.id!==id);
   else item.subtotal=item.qty*item.price;
   renderCart();updateCartTotals();
@@ -2160,7 +2370,7 @@ function setPayment(m){
   ['tunai','transfer','qris'].forEach(x=>document.getElementById('pay-'+x).classList.remove('active'));
   document.getElementById('pay-'+m).classList.add('active');
   document.getElementById('cash-input-wrap').style.display=m==='tunai'?'block':'none';
-  if(m!=='tunai'){document.getElementById('cash-input').value='';document.getElementById('change-display').innerHTML='';}
+  if(m!=='tunai'){document.getElementById('cash-input').value='';document.getElementById('change-display').innerHTML='';resetQuickCash();}
   else updateChange();
 }
 function updateChange(){
@@ -2173,6 +2383,45 @@ function updateChange(){
   el.innerHTML=change>=0?
     `<div style="background:#d4f0e2;border:1.5px solid #90d0b0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:600;color:#0a5030">💰 KEMBALIAN</span><span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:#0a5030">${fmt(change)}</span></div>`:
     `<div style="background:#fde8e4;border:1.5px solid #f0a090;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:600;color:#8a2010">⚠️ KURANG</span><span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:#8a2010">${fmt(-change)}</span></div>`;
+}
+// Quick cash nominal buttons
+// Klik pertama → set ke nominal itu; klik lagi nominal yang sama → tambah ke dirinya sendiri
+// Track nominal terakhir yang ditekan — satu-satunya sumber kebenaran highlight
+// Quick cash: tiap klik SELALU akumulasi (tambah ke nilai yang ada)
+// Tombol Kosongkan muncul otomatis begitu ada nilai, untuk reset
+function quickCash(nominal){
+  const inp = document.getElementById('cash-input');
+  const current = parseFloat(inp.value) || 0;
+  inp.value = current + nominal;
+  updateQuickCashUI();
+  updateChange();
+}
+function clearQuickCash(){
+  const inp = document.getElementById('cash-input');
+  inp.value = '';
+  updateQuickCashUI();
+  updateChange();
+}
+function updateQuickCashUI(){
+  const val = parseFloat(document.getElementById('cash-input').value) || 0;
+  // Tampilkan total akumulasi & tombol kosongkan hanya jika ada nilai
+  const totalEl = document.getElementById('quick-cash-total');
+  const clearBtn = document.getElementById('btn-quick-clear');
+  if(val > 0){
+    totalEl.textContent = '= ' + val.toLocaleString('id-ID');
+    if(clearBtn) clearBtn.style.display = '';
+  } else {
+    totalEl.textContent = '';
+    if(clearBtn) clearBtn.style.display = 'none';
+  }
+}
+function syncQuickCashHighlight(){
+  // Dipanggil saat user mengetik manual → update UI tombol kosongkan
+  updateQuickCashUI();
+}
+function resetQuickCash(){
+  document.getElementById('cash-input').value = '';
+  updateQuickCashUI();
 }
 function getCartTotal(){
   const sub=cart.reduce((a,c)=>a+c.subtotal,0);
@@ -2214,8 +2463,12 @@ async function checkout(){
       cashier:currentUser.name, cashierRole:currentUser.role,
       items:cart.map(c=>{
         const p=getProducts().find(x=>x.id===c.id);
-        const newStock=Math.max(0,(p?p.stock:0)-c.qty);
-        return {productId:c.id,productName:c.name,qty:c.qty,sellPrice:c.price,buyPrice:c.buyPrice||0,subtotal:c.subtotal,newStock};
+        const resep=(cache.resep[c.id]||[]).filter(r=>r.bbId&&r.qty>0);
+        const hasResepItem = resep.length > 0;
+        // Produk berresep: stock produk tidak dikurangi (yang dikurangi BB via backend)
+        // Produk manual: kurangi p.stock
+        const newStock = hasResepItem ? (p?p.stock:0) : Math.max(0,(p?p.stock:0)-c.qty);
+        return {productId:c.id,productName:c.name,qty:c.qty,sellPrice:c.price,buyPrice:c.buyPrice||0,subtotal:c.subtotal,newStock,hasResep:hasResepItem};
       })
     };
 
@@ -2226,10 +2479,20 @@ async function checkout(){
     cache.sales.push({...sale, items:sale.items.map(i=>({...i}))});
     sale.items.forEach(item=>{
       const p=cache.products.find(x=>x.id===item.productId);
-      if(p) p.stock=item.newStock;
+      // Hanya update p.stock untuk produk tanpa resep
+      // Produk berresep: stoknya dari BB, bukan p.stock
+      if(p && !item.hasResep) p.stock=item.newStock;
     });
 
-    const warnings=sale.items.filter(i=>{ const p=cache.products.find(x=>x.id===i.productId); return p&&p.stock<=p.minStock; }).map(i=>i.productName);
+    // Warning stok menipis hanya untuk produk tanpa resep (yang pakai p.stock)
+    // Produk berresep → BB warning sudah dihandle oleh deductBahanBakuFromSale
+    const warnings=sale.items.filter(i=>{
+      const p=cache.products.find(x=>x.id===i.productId);
+      if(!p) return false;
+      const resep=(cache.resep[i.productId]||[]).filter(r=>r.bbId&&r.qty>0);
+      if(resep.length>0) return false; // punya resep → skip
+      return p.stock<=p.minStock;
+    }).map(i=>i.productName);
     if(warnings.length>0) toast('⚠️ Stok menipis: '+warnings.join(', '),'warn');
     toast('Transaksi berhasil disimpan!','success');
 
@@ -2242,6 +2505,7 @@ async function checkout(){
     document.getElementById('discount-input').value='';
     document.getElementById('cash-input').value='';
     document.getElementById('change-display').innerHTML='';
+    resetQuickCash();
     setPayment('tunai');
     renderCart();
     updateCartTotals();
@@ -2256,28 +2520,39 @@ async function checkout(){
   }
 }
 
-function showReceipt(sale){
+async function showReceipt(sale){
   lastSaleData=sale;
+  // Selalu ambil pengaturan struk terbaru dari Firestore setiap kali struk dibuka
+  await loadStrukSettings();
   // Refresh BT status indicator whenever receipt opens
   setTimeout(()=>updateBtStatus(!!btCharacteristic, btDevice?btDevice.name:''),100);
   const change=sale.change>0?`<div class="receipt-row"><span>Kembalian</span><span>${fmt(sale.change)}</span></div>`:'';
+  // Baris header kustom (multi-line support)
+  const headerLines=(strukCfg.header_custom||'').split('\n').filter(Boolean).map(l=>`<div class="receipt-center"><small>${l}</small></div>`).join('');
+  // Baris footer kustom (multi-line support)
+  const footerLines=(strukCfg.footer_custom||'Terima kasih atas kunjungan Anda!').split('\n').filter(Boolean).map(l=>`<div class="receipt-center"><small>${l}</small></div>`).join('');
   document.getElementById('receipt-content').innerHTML=`
     <div class="receipt">
-      <div class="receipt-center"><strong style="font-size:16px">SANA COFFEE</strong><br><small>Sana Coffee · Point of Sale</small><br><small>${fmtDatetime(sale.datetime)||new Date().toLocaleString('id-ID')}</small></div>
+      <div class="receipt-center"><strong style="font-size:16px">${strukCfg.nama_toko||'SANA COFFEE'}</strong></div>
+      ${strukCfg.tagline?`<div class="receipt-center"><small>${strukCfg.tagline}</small></div>`:''}
+      ${strukCfg.alamat?`<div class="receipt-center"><small>${strukCfg.alamat}</small></div>`:''}
+      ${strukCfg.telp?`<div class="receipt-center"><small>&#128222; ${strukCfg.telp}</small></div>`:''}
+      <div class="receipt-center"><small>${fmtDatetime(sale.datetime)||new Date().toLocaleString('id-ID')}</small></div>
+      ${headerLines?`<div class="receipt-line"></div>${headerLines}`:''}
       <div class="receipt-line"></div>
       <div class="receipt-row"><span>No.</span><span>${sale.id}</span></div>
       <div class="receipt-row"><span>Kasir</span><span>${sale.cashier}</span></div>
       <div class="receipt-row"><span>Pelanggan</span><span>${sale.customer}</span></div>
       <div class="receipt-line"></div>
-      ${sale.items.map(i=>`<div class="receipt-row"><span>${i.productName}</span><span></span></div><div class="receipt-row"><span>&nbsp;&nbsp;${i.qty} × ${fmt(i.sellPrice)}</span><span>${fmt(i.subtotal)}</span></div>`).join('')}
+      ${sale.items.map(i=>`<div class="receipt-row"><span>${i.productName}</span><span></span></div><div class="receipt-row"><span>&nbsp;&nbsp;${i.qty} \xd7 ${fmt(i.sellPrice)}</span><span>${fmt(i.subtotal)}</span></div>`).join('')}
       <div class="receipt-line"></div>
       <div class="receipt-row"><span>Subtotal</span><span>${fmt(sale.subtotal)}</span></div>
       ${sale.discount>0?`<div class="receipt-row"><span>Diskon</span><span>- ${fmt(sale.discount)}</span></div>`:''}
       <div class="receipt-row"><strong>TOTAL</strong><strong>${fmt(sale.total)}</strong></div>
-      <div class="receipt-row"><span>${sale.payment.toUpperCase()}</span><span>${sale.payment==='tunai'?fmt(sale.total+sale.change):'—'}</span></div>
+      ${sale.payment==='tunai'?`<div class="receipt-row"><span>TUNAI</span><span>${fmt(sale.total+sale.change)}</span></div>`:`<div class="receipt-row"><span>${sale.payment.toUpperCase()}</span><span>—</span></div>`}
       ${change}
       <div class="receipt-line"></div>
-      <div class="receipt-center"><small>Terima kasih atas kunjungan Anda!</small></div>
+      ${footerLines}
     </div>`;
   openModal('modal-receipt');
 }
@@ -2460,7 +2735,11 @@ function encBytes(text){
 // BUG FIX: twoCol — hitung panjang string dengan benar
 // Sebelumnya String(r).length tidak dihitung saat menentukan spasi
 function twoCol(l,r,W=32){
-  const ls=String(l||''),rs=String(r||'');
+  const rs=String(r||'');
+  let ls=String(l||'');
+  // Truncate kiri jika total melebihi lebar kertas (sisakan 1 spasi + kolom kanan)
+  const maxLeft=W-rs.length-1;
+  if(ls.length>maxLeft) ls=ls.substring(0,Math.max(1,maxLeft));
   const spaces=W-ls.length-rs.length;
   return ls+' '.repeat(Math.max(1,spaces))+rs;
 }
@@ -2530,13 +2809,16 @@ async function printThermal(){
   const origText=btnP.textContent;
   btnP.disabled=true;
 
+  // Ambil delay dari pengaturan (default 8 detik, min 0, max 30)
+  const delaySec = Math.max(0, Math.min(30, Number(strukCfg.delay_rangkap2)||8));
+
   try{
     btnP.textContent='⏳ Print Rangkap 1/2...';
     await doPrintCopy(lastSaleData, 1);
     toast('Rangkap 1 tercetak ✓','success');
 
-    // Tunggu printer selesai memotong kertas sebelum rangkap 2 (8 detik)
-    for(let s=8;s>0;s--){
+    // Countdown sebelum rangkap 2 (sesuai pengaturan)
+    for(let s=delaySec;s>0;s--){
       btnP.textContent='⏳ Rangkap 2 dalam '+s+'s...';
       await new Promise(r=>setTimeout(r,1000));
     }
@@ -2555,81 +2837,99 @@ async function printThermal(){
 async function doPrintCopy(sale, copyNum){
   const W=32;
   let b=[];
-
-  // BUG FIX: ESC_INIT selalu di awal untuk reset printer state
   b.push(...ESC_INIT);
   b.push(...FEED(1));
 
-  // Header — CENTER, BOLD, BIG
-  b.push(...ESC_CENTER,...ESC_BIG,...ESC_BOLD_ON);
-  b.push(...encBytes('SANA COFFEE'),...LF);
-  // BUG FIX: Selalu reset ESC_NORMAL & ESC_BOLD_OFF setelah ESC_BIG
-  // Tanpa ini, semua baris berikutnya ikut jadi besar/bold
-  b.push(...ESC_NORMAL,...ESC_BOLD_OFF);
-  b.push(...encBytes('Sana Coffee - Point of Sale'),...LF);
-
-  // Tanggal/waktu — format string aman
-  const dtStr=sale.datetime?new Date(sale.datetime).toLocaleString('id-ID',{
-    day:'2-digit',month:'2-digit',year:'numeric',
-    hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false
-  }):(new Date().toLocaleString('id-ID'));
-  b.push(...encBytes(dtStr),...LF);
-
-  // Label rangkap — CENTER, BOLD
-  b.push(...ESC_BOLD_ON);
-  const rankapLabel=copyNum===1?'[ RANGKAP 1 - PELANGGAN ]':'[ RANGKAP 2 - PEMBUKUAN ]';
-  b.push(...encBytes(centerStr(rankapLabel,W)),...LF);
-  b.push(...ESC_BOLD_OFF);
-
-  // Kembali ke LEFT untuk body struk
-  b.push(...ESC_LEFT);
-  b.push(...encBytes(dash(W)),...LF);
-  b.push(...encBytes(twoCol('No:',sale.id||'-',W)),...LF);
-  b.push(...encBytes(twoCol('Kasir:',sale.cashier||'-',W)),...LF);
-  b.push(...encBytes(twoCol('Pelanggan:',sale.customer||'Umum',W)),...LF);
-  b.push(...encBytes(dash(W)),...LF);
-
-  // Items
-  (sale.items||[]).forEach(item=>{
-    // Nama produk — potong jika terlalu panjang
-    const nama=String(item.productName||'-').substring(0,W);
-    b.push(...encBytes(nama),...LF);
-    // BUG FIX: Gunakan fmtThermal (tanpa 'Rp ' prefix) lalu tambah manual sebagai ASCII
-    const qtyLine=twoCol('  '+item.qty+' x Rp'+fmtThermal(item.sellPrice),'Rp'+fmtThermal(item.subtotal),W);
-    b.push(...encBytes(qtyLine),...LF);
-  });
-
-  b.push(...encBytes(dash(W)),...LF);
-  b.push(...encBytes(twoCol('Subtotal','Rp'+fmtThermal(sale.subtotal),W)),...LF);
-  if(Number(sale.discount)>0){
-    b.push(...encBytes(twoCol('Diskon','-Rp'+fmtThermal(sale.discount),W)),...LF);
-  }
-
-  // Total — BOLD
-  b.push(...ESC_BOLD_ON);
-  b.push(...encBytes(twoCol('TOTAL','Rp'+fmtThermal(sale.total),W)),...LF);
-  b.push(...ESC_BOLD_OFF);
-
-  b.push(...encBytes(twoCol('Bayar',(sale.payment||'').toUpperCase(),W)),...LF);
-  if(Number(sale.change)>0){
-    b.push(...encBytes(twoCol('Kembalian','Rp'+fmtThermal(sale.change),W)),...LF);
-  }
-
-  b.push(...encBytes(dash(W)),...LF);
-
-  // Footer — CENTER
-  b.push(...ESC_CENTER);
   if(copyNum===1){
-    b.push(...encBytes('Terima kasih atas kunjungan Anda!'),...LF);
-    b.push(...encBytes('Sampai jumpa kembali :)'),...LF);
-  }else{
-    b.push(...encBytes('-- Arsip Pembukuan --'),...LF);
-    b.push(...encBytes('Simpan struk ini untuk pencatatan.'),...LF);
+    // ══ RANGKAP 1 — STRUK PELANGGAN (LENGKAP) ══
+    b.push(...ESC_CENTER,...ESC_BIG,...ESC_BOLD_ON);
+    b.push(...encBytes(strukCfg.nama_toko||'SANA COFFEE'),...LF);
+    b.push(...ESC_NORMAL,...ESC_BOLD_OFF);
+    if(strukCfg.tagline) b.push(...encBytes(strukCfg.tagline),...LF);
+    if(strukCfg.alamat)  b.push(...encBytes(strukCfg.alamat),...LF);
+    if(strukCfg.telp)    b.push(...encBytes('Tel: '+strukCfg.telp),...LF);
+
+    const dtStr=sale.datetime?new Date(sale.datetime).toLocaleString('id-ID',{
+      day:'2-digit',month:'2-digit',year:'numeric',
+      hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false
+    }):(new Date().toLocaleString('id-ID'));
+    b.push(...encBytes(dtStr),...LF);
+
+    b.push(...ESC_BOLD_ON);
+    b.push(...encBytes(centerStr('[ RANGKAP 1 - PELANGGAN ]',W)),...LF);
+    b.push(...ESC_BOLD_OFF,...ESC_LEFT);
+
+    b.push(...encBytes(dash(W)),...LF);
+    b.push(...encBytes(twoCol('No:',sale.id||'-',W)),...LF);
+    b.push(...encBytes(twoCol('Kasir:',sale.cashier||'-',W)),...LF);
+    b.push(...encBytes(twoCol('Pelanggan:',sale.customer||'Umum',W)),...LF);
+    if(strukCfg.header_custom){
+      b.push(...encBytes(dash(W)),...LF);
+      b.push(...ESC_CENTER);
+      strukCfg.header_custom.split('\n').filter(Boolean).forEach(l=>b.push(...encBytes(l),...LF));
+      b.push(...ESC_LEFT);
+    }
+    b.push(...encBytes(dash(W)),...LF);
+
+    (sale.items||[]).forEach(item=>{
+      b.push(...encBytes(String(item.productName||'-').substring(0,W)),...LF);
+      b.push(...encBytes(twoCol('  '+item.qty+' x Rp'+fmtThermal(item.sellPrice),'Rp'+fmtThermal(item.subtotal),W)),...LF);
+    });
+
+    b.push(...encBytes(dash(W)),...LF);
+    b.push(...encBytes(twoCol('Subtotal','Rp'+fmtThermal(sale.subtotal),W)),...LF);
+    if(Number(sale.discount)>0)
+      b.push(...encBytes(twoCol('Diskon','-Rp'+fmtThermal(sale.discount),W)),...LF);
+    b.push(...ESC_BOLD_ON);
+    b.push(...encBytes(twoCol('TOTAL','Rp'+fmtThermal(sale.total),W)),...LF);
+    b.push(...ESC_BOLD_OFF);
+    b.push(...encBytes(twoCol('Bayar',(sale.payment||'').toUpperCase(),W)),...LF);
+    if(Number(sale.change)>0)
+      b.push(...encBytes(twoCol('Kembalian','Rp'+fmtThermal(sale.change),W)),...LF);
+
+    b.push(...encBytes(dash(W)),...LF);
+    b.push(...ESC_CENTER);
+    const tfLines=(strukCfg.footer_custom||'Terima kasih atas kunjungan Anda!').split('\n').filter(Boolean);
+    tfLines.forEach(l=>b.push(...encBytes(l),...LF));
+
+  } else {
+    // ══ RANGKAP 2 — RINGKAS, HANYA ORDERAN ══
+    const dtShort=sale.datetime?new Date(sale.datetime).toLocaleString('id-ID',{
+      day:'2-digit',month:'2-digit',year:'numeric',
+      hour:'2-digit',minute:'2-digit',hour12:false
+    }):(new Date().toLocaleString('id-ID'));
+
+    // Nama toko kecil + label ringkas
+    b.push(...ESC_CENTER,...ESC_BOLD_ON);
+    b.push(...encBytes(strukCfg.nama_toko||'SANA COFFEE'),...LF);
+    b.push(...ESC_BOLD_OFF);
+    b.push(...encBytes(dtShort),...LF);
+    b.push(...ESC_BOLD_ON);
+    b.push(...encBytes(centerStr('[ DAPUR / ARSIP ]',W)),...LF);
+    b.push(...ESC_BOLD_OFF,...ESC_LEFT);
+
+    b.push(...encBytes(dash(W)),...LF);
+    b.push(...encBytes(twoCol('No:',sale.id||'-',W)),...LF);
+    b.push(...encBytes(twoCol('Kasir:',sale.cashier||'-',W)),...LF);
+    if(sale.customer && sale.customer!=='Umum')
+      b.push(...encBytes(twoCol('Pelanggan:',sale.customer,W)),...LF);
+    b.push(...encBytes(dash(W)),...LF);
+
+    // Hanya nama item dan qty — tanpa harga, lebih ringkas
+    (sale.items||[]).forEach(item=>{
+      const nama=String(item.productName||'-').substring(0,W-6);
+      b.push(...encBytes(twoCol(nama,'x'+item.qty,W)),...LF);
+    });
+
+    b.push(...encBytes(dash(W)),...LF);
+    // Hanya total final
+    b.push(...ESC_BOLD_ON);
+    b.push(...encBytes(twoCol('TOTAL','Rp'+fmtThermal(sale.total),W)),...LF);
+    b.push(...ESC_BOLD_OFF);
   }
 
   // Feed & cut
   b.push(...FEED(4),...ESC_CUT);
-
   await sendToPrinter(b);
 }
 
@@ -2654,22 +2954,67 @@ function renderInventory(){
   catSel.innerHTML='<option value="">Semua Kategori</option>'+cats.map(c=>`<option value="${c}" ${c===curCat?'selected':''}>${c}</option>`).join('');
   document.getElementById('cat-datalist').innerHTML=cats.map(c=>`<option value="${c}">`).join('');
 
+  // Hitung ATS untuk semua produk agar status stok akurat
+  const bbReady = cache.bahanbaku && cache.bahanbaku.length > 0;
+  const atsMap = bbReady ? calcAllATS() : {};
+
+  // Helper: tentukan status efektif produk (mempertimbangkan ATS)
+  function getEffectiveStatus(p){
+    const ats = atsMap[p.id] !== undefined ? atsMap[p.id] : null;
+    const hasResep = ats !== null;
+    if(hasResep){
+      const atsZero = ats.cups === 0;
+      const atsLow  = ats.cups > 0 && ats.cups <= 5;
+      if(atsZero) return 'out';
+      if(atsLow)  return 'low';
+      return 'ok';
+    }
+    // Tidak ada resep → pakai p.stock
+    if(p.stock === 0) return 'out';
+    if(p.stock > 0 && p.stock <= p.minStock) return 'low';
+    return 'ok';
+  }
+
   const filtered=products.filter(p=>{
     if(q&&!p.name.toLowerCase().includes(q)&&!(p.code||'').toLowerCase().includes(q)&&!(p.category||'').toLowerCase().includes(q)) return false;
     if(cat&&p.category!==cat) return false;
-    if(sf==='low'&&!(p.stock>0&&p.stock<=p.minStock)) return false;
-    if(sf==='out'&&p.stock!==0) return false;
-    if(sf==='ok'&&p.stock<=p.minStock) return false;
+    const status = getEffectiveStatus(p);
+    if(sf==='low'  && status !== 'low') return false;
+    if(sf==='out'  && status !== 'out') return false;
+    if(sf==='ok'   && status !== 'ok')  return false;
     return true;
   });
 
-  const lowCount=products.filter(p=>p.stock>0&&p.stock<=p.minStock).length;
-  const outCount=products.filter(p=>p.stock===0).length;
+  const outCount = products.filter(p=>getEffectiveStatus(p)==='out').length;
+  const lowCount = products.filter(p=>getEffectiveStatus(p)==='low').length;
   document.getElementById('inv-alerts').innerHTML=(lowCount+outCount>0)?
     `<div class="alert alert-warn">⚠️ <strong>${outCount} produk habis</strong> dan <strong>${lowCount} produk stok menipis</strong>. <a href="#" onclick="showPage('purchase');return false" style="color:var(--warn);font-weight:600">Buat Pembelian →</a></div>`:'';
 
   document.getElementById('inv-tbody').innerHTML=filtered.length?filtered.map(p=>{
-    const isOut=p.stock===0,isLow=p.stock>0&&p.stock<=p.minStock;
+    const ats = atsMap[p.id] !== undefined ? atsMap[p.id] : null;
+    const hasResep = ats !== null;
+    const status = getEffectiveStatus(p);
+    const isOut = status === 'out';
+    const isLow = status === 'low';
+
+    // Kolom STOK: jika punya resep → tampilkan ATS (cup), jika tidak → p.stock
+    let stokHtml = '';
+    if(hasResep){
+      if(isOut){
+        // Tampilkan BB yang habis sebagai tooltip/list kecil
+        const emptyList = (ats.emptyBBList || []);
+        const bbInfo = emptyList.length
+          ? emptyList.map(b=>`<div style="font-size:10px;color:var(--accent);margin-top:2px">⚠️ ${b.name} (stok: ${b.stock} ${b.unit})</div>`).join('')
+          : `<div style="font-size:10px;color:var(--accent);margin-top:2px">⚠️ ${ats.limitingBB||'cek resep'}</div>`;
+        stokHtml = `<span class="tag tag-red">BB HABIS</span>${bbInfo}`;
+      } else {
+        const cupsColor = isLow ? 'tag-yellow' : 'tag-green';
+        stokHtml = `<span class="tag ${cupsColor}">~${ats.cups} cup</span><div style="font-size:10px;color:var(--ink3);margin-top:2px">🧪 dari bahan baku</div>`;
+      }
+    } else {
+      stokHtml = `<span class="tag ${isOut?'tag-red':isLow?'tag-yellow':'tag-green'}">${isOut?'HABIS':fmtNum(p.stock)+' '+p.unit}</span>`;
+    }
+
     return `<tr>
       <td><div style="width:40px;height:40px;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center">${p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover">`:'<span style="font-size:18px">🛍️</span>'}</div></td>
       <td class="td-mono">${p.code||'-'}</td>
@@ -2677,8 +3022,8 @@ function renderInventory(){
       <td><span class="tag tag-blue">${p.category||'-'}</span></td>
       <td class="td-mono">${fmt(p.buyPrice)}</td>
       <td class="td-mono" style="font-weight:600">${fmt(p.sellPrice)}</td>
-      <td><span class="tag ${isOut?'tag-red':isLow?'tag-yellow':'tag-green'}">${isOut?'HABIS':fmtNum(p.stock)+' '+p.unit}</span></td>
-      <td class="td-mono">${p.minStock}</td>
+      <td>${stokHtml}</td>
+      <td class="td-mono">${hasResep?'<span style="font-size:11px;color:var(--ink3)">—</span>':p.minStock}</td>
       <td><span class="tag ${isOut?'tag-red':isLow?'tag-yellow':'tag-green'}">${isOut?'Habis':isLow?'Menipis':'Aman'}</span></td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-secondary btn-sm btn-icon" onclick="openProductModal('${p.id}')">✏️</button>
@@ -2980,6 +3325,7 @@ async function savePurchase(){
     if(freshBB.success && freshBB.data) cache.bahanbaku=freshBB.data;
 
     renderPurchases();
+    refreshPOSIfActive();
     // Refresh halaman bahan baku jika sedang aktif
     const activePage=document.querySelector('.page.active');
     if(activePage && activePage.id==='page-bahanbaku') renderBahanBakuPage();
@@ -3081,7 +3427,7 @@ let currentReport='penjualan';
 function switchReport(t,el){currentReport=t;document.querySelectorAll('.report-tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');renderLaporan();}
 function setDateRange(r){
   const d=new Date(),to=today();let from=to;
-  if(r==='week'){const dd=new Date();dd.setDate(dd.getDate()-6);from=dd.toISOString().slice(0,10);}
+  if(r==='week'){const dd=new Date();dd.setDate(dd.getDate()-6);from=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');}
   else if(r==='month'){from=d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'))+'-01';}
   else if(r==='all'){from='2000-01-01';}
   document.getElementById('lap-from').value=from;
@@ -3157,10 +3503,10 @@ async function deleteSale(id){
     renderLaporan();
     toast('Transaksi berhasil dihapus!','success');
   }catch(err){
-    // Fallback: hapus dari cache lokal saja
-    cache.sales=cache.sales.filter(x=>x.id!==id);
+    // Jangan hapus dari cache lokal jika API gagal — data di server mungkin masih ada
+    // Ini mencegah inkonsistensi antara tampilan dan data server
+    toast('Gagal menghapus: '+err.message+'. Data di server mungkin masih ada.','error');
     renderLaporan();
-    toast('Dihapus dari lokal (sinkronisasi gagal: '+err.message+')','warn');
   }finally{hideLoading();}
 }
 
@@ -3214,8 +3560,10 @@ function saveBahanBakuLocal(){
 function deductBahanBakuFromSale(items){
   let bbLow=[];
   items.forEach(item=>{
-    const resep = cache.resep[item.productId];
-    if(!resep || resep.length===0) return;
+    const resepRaw = cache.resep[item.productId];
+    // Filter hanya item resep yang valid
+    const resep = (resepRaw||[]).filter(r=>r.bbId&&Number(r.qty)>0);
+    if(resep.length===0) return;
     resep.forEach(r=>{
       const bb = cache.bahanbaku.find(x=>x.id===r.bbId);
       if(!bb) return;
@@ -3225,8 +3573,8 @@ function deductBahanBakuFromSale(items){
     });
   });
   if(bbLow.length>0) toast('⚠️ Bahan baku menipis: '+bbLow.join(', '),'warn');
-  // Refresh POS grid so ATS indicators update immediately
-  filterPOS();
+  // filterPOS() tidak dipanggil di sini — sudah dipanggil oleh checkout flow
+  // dan filterPOS sekarang fetch BB terbaru dari Firestore otomatis
 }
 
 // Calculate HPP per product based on recipe
@@ -3258,24 +3606,53 @@ function checkBahanBakuCart(cartItems){
 // ── ATS: hitung estimasi berapa cup produk bisa dibuat dari stok BB saat ini
 // Memperhitungkan shared ingredients — stok BB dibagi proporsional
 function calcATS(productId) {
-  const resep = cache.resep[productId];
-  if (!resep || resep.length === 0) return null; // null = tidak ada resep, jangan tampilkan
+  const resepRaw = cache.resep[productId];
+  // Filter hanya item yang valid (bbId ada dan qty > 0)
+  const resep = (resepRaw || []).filter(r => r.bbId && Number(r.qty) > 0);
+  if (!resep || resep.length === 0) return null; // null = tidak ada resep / semua item invalid
+
+  // BUG FIX: Jika cache BB kosong sama sekali, jangan hitung ATS
+  // Ini mencegah false "stok habis" saat data BB belum selesai dimuat
+  if (!cache.bahanbaku || cache.bahanbaku.length === 0) return null;
 
   let minCups = Infinity;
   let limitingBB = null;
+  let foundAny = false;    // minimal 1 BB harus ditemukan agar ATS valid
+  let missingBB = 0;       // jumlah BB di resep yang tidak ada di cache
+  let totalBBInResep = 0;  // total BB yang seharusnya ada
+
+  const emptyBBList = []; // daftar BB yang stoknya habis (untuk ditampilkan di card)
 
   resep.forEach(r => {
+    // qty resep 0 atau negatif = tidak masuk akal → skip
+    if (!r.qty || Number(r.qty) <= 0) return;
+    totalBBInResep++;
     const bb = cache.bahanbaku.find(x => x.id === r.bbId);
-    if (!bb || !r.qty) return;
+    // BB tidak ditemukan di cache = data belum load / bahan dihapus → catat sebagai missing
+    if (!bb) { missingBB++; return; }
+    foundAny = true;
     const canMake = Math.floor(Number(bb.stock || 0) / Number(r.qty));
+    if (canMake === 0) emptyBBList.push({ name: bb.name, unit: bb.unit, stock: Number(bb.stock||0), need: Number(r.qty) });
     if (canMake < minCups) {
       minCups = canMake;
       limitingBB = bb.name;
     }
   });
 
-  if (minCups === Infinity) return null;
-  return { cups: minCups, limitingBB };
+  // BUG FIX: Jika SEMUA BB di resep tidak ditemukan di cache → data cache tidak lengkap
+  // Jangan anggap stok habis; return null agar produk tetap bisa dijual
+  if (!foundAny || minCups === Infinity) return null;
+
+  // BUG FIX: Jika sebagian BB tidak ditemukan di cache, kita tidak bisa pastikan ATS akurat
+  // Jika ATS yang terhitung = 0, tapi ada BB yang missing → jangan blokir produk
+  // (mungkin yang menyebabkan 0 justru BB yang tidak ada di cache = data stale)
+  if (minCups === 0 && missingBB > 0) {
+    // Ada BB yang hilang dari cache dan ada yang limit ke 0 — tidak bisa pastikan mana penyebabnya
+    // Return null agar tidak memblokir produk secara salah
+    return null;
+  }
+
+  return { cups: minCups, limitingBB, missingBB, emptyBBList };
 }
 
 // Hitung ATS untuk semua produk sekaligus (efisien, 1x loop BB)
@@ -3305,7 +3682,7 @@ function renderBBStats(){
   const low = bbs.filter(b=>Number(b.stock)>0&&Number(b.stock)<=Number(b.minStock));
   const out = bbs.filter(b=>Number(b.stock)===0);
   const totalVal = bbs.reduce((a,b)=>(Number(b.stock)||0)*(Number(b.price)||0)+a,0);
-  const prodsWithResep = Object.keys(cache.resep).filter(k=>cache.resep[k]&&cache.resep[k].length>0).length;
+  const prodsWithResep = Object.keys(cache.resep).filter(k=>(cache.resep[k]||[]).some(r=>r.bbId&&r.qty>0)).length;
   document.getElementById('bb-stats').innerHTML=`
     <div class="bb-stat"><div class="bb-stat-label">Total Bahan Baku</div><div class="bb-stat-val">${bbs.length}</div></div>
     <div class="bb-stat"><div class="bb-stat-label">Stok Menipis</div><div class="bb-stat-val" style="color:var(--warn)">${low.length}</div></div>
@@ -3415,7 +3792,7 @@ function renderResepList(){
             <div style="font-size:11px;color:var(--ink3)">
               ${e.isInventori?`${fmt(e.sellPrice)} · `:''}
               <span class="tag ${e.isInventori?'tag-blue':'tag-gray'}" style="font-size:10px">${e.isInventori?'Inventori':'Kustom'}</span>
-              · ${e.resep.length} bahan
+              · ${(()=>{ const valid=(e.resep||[]).filter(r=>r.bbId&&r.qty>0).length; return valid>0?valid+' bahan':'<span style="color:var(--accent);font-weight:600">Belum ada resep</span>'; })()}
             </div>
           </div>
         </div>
@@ -3449,11 +3826,14 @@ function renderResepList(){
 }
 
 function hapusResep(productId){
-  document.getElementById('confirm-text').textContent = `Hapus semua resep untuk produk ini?`;
-  document.getElementById('confirm-ok-btn').onclick = ()=>{
-    cache.resep[productId] = [];
+  const produk=getProducts().find(x=>x.id===productId);
+  const nama=produk?produk.name:(productId.startsWith('CUSTOM_')?productId.replace('CUSTOM_','').replace(/_/g,' '):productId);
+  document.getElementById('confirm-text').textContent=`Hapus semua resep untuk "${nama}"?`;
+  document.getElementById('confirm-ok-btn').onclick=()=>{
+    // Delete key sepenuhnya agar produk tidak lagi dianggap punya resep
+    delete cache.resep[productId];
     saveBahanBakuLocal();
-    api('saveResep',{productId, productName:'', items:[]}).catch(()=>{});
+    api('saveResep',{productId, productName:nama, items:[]}).catch(()=>{});
     renderBahanBakuPage();
     closeModal('modal-confirm');
     toast('Resep dihapus!','success');
@@ -3543,22 +3923,28 @@ function saveBahanBaku(){
     updatedAt:new Date().toISOString()
   };
   showLoading('Menyimpan bahan baku...');
-  api('saveBahanBaku',{bahanbaku:bb}).then(result=>{
-    if(!result.success) throw new Error(result.message);
-    if(editingBB){ const idx=cache.bahanbaku.findIndex(x=>x.id===editingBB); if(idx>=0) cache.bahanbaku[idx]=bb; }
-    else cache.bahanbaku.push(bb);
-    closeModal('modal-bahanbaku');
-    renderBahanBakuPage();
-    toast(editingBB?'Bahan baku diperbarui!':'Bahan baku ditambahkan!','success');
-  }).catch(err=>{
-    // Fallback ke localStorage jika API gagal
-    if(editingBB){ const idx=cache.bahanbaku.findIndex(x=>x.id===editingBB); if(idx>=0) cache.bahanbaku[idx]=bb; }
-    else cache.bahanbaku.push(bb);
-    saveBahanBakuLocal();
-    closeModal('modal-bahanbaku');
-    renderBahanBakuPage();
-    toast('Disimpan lokal (API gagal: '+err.message+')','warn');
-  }).finally(()=>hideLoading());
+  (async()=>{
+    try{
+      const result=await api('saveBahanBaku',{bahanbaku:bb});
+      if(!result.success) throw new Error(result.message);
+      if(editingBB){ const idx=cache.bahanbaku.findIndex(x=>x.id===editingBB); if(idx>=0) cache.bahanbaku[idx]=bb; }
+      else cache.bahanbaku.push(bb);
+      closeModal('modal-bahanbaku');
+      renderBahanBakuPage();
+      refreshPOSIfActive();
+      toast(editingBB?'Bahan baku diperbarui!':'Bahan baku ditambahkan!','success');
+    }catch(err){
+      // Fallback ke localStorage jika API gagal, cegah double push
+      const idx=cache.bahanbaku.findIndex(x=>x.id===bb.id);
+      if(idx>=0) cache.bahanbaku[idx]=bb;
+      else if(!editingBB) cache.bahanbaku.push(bb);
+      saveBahanBakuLocal();
+      closeModal('modal-bahanbaku');
+      renderBahanBakuPage();
+      refreshPOSIfActive();
+      toast('Disimpan lokal (API gagal: '+err.message+')','warn');
+    }finally{hideLoading();}
+  })();
 }
 
 function confirmDeleteBB(id){
@@ -3566,19 +3952,18 @@ function confirmDeleteBB(id){
   document.getElementById('confirm-text').textContent=`Yakin hapus bahan baku "${b?.name}"? Resep yang menggunakan bahan ini juga akan terpengaruh.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     showLoading('Menghapus...');
-    api('deleteBahanBaku',{id}).then(result=>{
-      if(!result.success) throw new Error(result.message);
-      cache.bahanbaku=cache.bahanbaku.filter(x=>x.id!==id);
-      Object.keys(cache.resep).forEach(pid=>{ cache.resep[pid]=(cache.resep[pid]||[]).filter(r=>r.bbId!==id); });
-      renderBahanBakuPage();
-      toast('Bahan baku dihapus!','success');
-    }).catch(err=>{
-      cache.bahanbaku=cache.bahanbaku.filter(x=>x.id!==id);
-      Object.keys(cache.resep).forEach(pid=>{ cache.resep[pid]=(cache.resep[pid]||[]).filter(r=>r.bbId!==id); });
-      saveBahanBakuLocal();
-      renderBahanBakuPage();
-      toast('Dihapus lokal (API gagal)','warn');
-    }).finally(()=>{ hideLoading(); closeModal('modal-confirm'); });
+    (async()=>{
+      try{
+        const result=await api('deleteBahanBaku',{id});
+        if(!result.success) throw new Error(result.message);
+        cache.bahanbaku=cache.bahanbaku.filter(x=>x.id!==id);
+        Object.keys(cache.resep).forEach(pid=>{ cache.resep[pid]=(cache.resep[pid]||[]).filter(r=>r.bbId!==id); });
+        renderBahanBakuPage();
+        toast('Bahan baku dihapus!','success');
+      }catch(err){
+        toast('Gagal menghapus: '+err.message+'. Data di server mungkin masih ada.','error');
+      }finally{ hideLoading(); closeModal('modal-confirm'); }
+    })();
   };
   openModal('modal-confirm');
 }
@@ -3601,21 +3986,28 @@ function doRestockBB(){
   const newPrice=parseFloat(document.getElementById('restock-bb-price').value)||0;
   const note=document.getElementById('restock-bb-note').value||'Restock manual';
   showLoading('Menyimpan restock...');
-  api('restockBahanBaku',{bbId:restockBBId, qty, price:newPrice, note}).then(result=>{
-    if(!result.success) throw new Error(result.message);
-    b.stock=(Number(b.stock)||0)+qty;
-    if(newPrice>0) b.price=newPrice;
-    closeModal('modal-restock-bb');
-    renderBahanBakuPage();
-    toast(`Stok ${b.name} ditambah ${fmtNum(qty)} ${b.unit}!`,'success');
-  }).catch(err=>{
-    b.stock=(Number(b.stock)||0)+qty;
-    if(newPrice>0) b.price=newPrice;
-    saveBahanBakuLocal();
-    closeModal('modal-restock-bb');
-    renderBahanBakuPage();
-    toast(`Stok ditambah lokal (API gagal)`, 'warn');
-  }).finally(()=>hideLoading());
+  (async()=>{
+    try{
+      const result=await api('restockBahanBaku',{bbId:restockBBId, qty, price:newPrice, note});
+      if(!result.success) throw new Error(result.message);
+      // Gunakan newStock dari server agar akurat (bukan hitung lokal)
+      b.stock = result.newStock !== undefined ? result.newStock : (Number(b.stock)||0)+qty;
+      if(newPrice>0) b.price=newPrice;
+      closeModal('modal-restock-bb');
+      renderBahanBakuPage();
+      refreshPOSIfActive();
+      toast(`Stok ${b.name} ditambah ${fmtNum(qty)} ${b.unit} ✓`,'success');
+    }catch(err){
+      // Fallback lokal hanya jika API benar-benar tidak bisa dijangkau
+      b.stock=(Number(b.stock)||0)+qty;
+      if(newPrice>0) b.price=newPrice;
+      saveBahanBakuLocal();
+      closeModal('modal-restock-bb');
+      renderBahanBakuPage();
+      refreshPOSIfActive();
+      toast(`Stok ditambah lokal (API gagal: ${err.message})`, 'warn');
+    }finally{hideLoading();}
+  })();
 }
 
 // RESEP MODAL
@@ -3753,19 +4145,28 @@ function saveResep(){
     return;
   }
   showLoading('Menyimpan resep...');
-  api('saveResep',{productId:editingResepProductId, productName:editingResepProductName, items}).then(result=>{
-    if(!result.success) throw new Error(result.message);
-    cache.resep[editingResepProductId]=items;
-    closeModal('modal-resep');
-    renderBahanBakuPage();
-    toast(`Resep "${editingResepProductName}" berhasil disimpan!`,'success');
-  }).catch(err=>{
-    cache.resep[editingResepProductId]=items;
-    saveBahanBakuLocal();
-    closeModal('modal-resep');
-    renderBahanBakuPage();
-    toast('Resep disimpan lokal (API gagal)','warn');
-  }).finally(()=>hideLoading());
+  (async()=>{
+    try{
+      const result=await api('saveResep',{productId:editingResepProductId, productName:editingResepProductName, items});
+      if(!result.success) throw new Error(result.message);
+      cache.resep[editingResepProductId]=items;
+      closeModal('modal-resep');
+      renderBahanBakuPage();
+      toast(`Resep "${editingResepProductName}" berhasil disimpan!`,'success');
+    }catch(err){
+      // Simpan ke cache lokal hanya jika belum ada (hindari overwrite jika sudah berhasil)
+      if(!cache.resep[editingResepProductId] ||
+         JSON.stringify(cache.resep[editingResepProductId]) !== JSON.stringify(items)){
+        cache.resep[editingResepProductId]=items;
+        saveBahanBakuLocal();
+      }
+      closeModal('modal-resep');
+      renderBahanBakuPage();
+      toast('Resep disimpan lokal (API gagal: '+err.message+')','warn');
+    }finally{
+      hideLoading();
+    }
+  })();
 }
 
 // ===================== PENGELUARAN OPERASIONAL =====================
@@ -3888,7 +4289,10 @@ async function saveExpense(){
     renderExpense();
     toast('Pengeluaran berhasil disimpan ✓','success');
   }catch(err){
-    cache.expenses.push(expense);
+    // Hanya simpan ke cache lokal jika API gagal (bukan karena result.success===false)
+    if(!cache.expenses.find(x=>x.id===expense.id)){
+      cache.expenses.push(expense);
+    }
     closeModal('modal-expense');
     renderExpense();
     toast('Disimpan lokal (Firebase gagal: '+err.message+')','warn');
@@ -3913,9 +4317,8 @@ async function deleteExpense(id){
     renderExpense();
     toast('Pengeluaran dihapus!','success');
   }catch(err){
-    cache.expenses=cache.expenses.filter(x=>x.id!==id);
+    toast('Gagal menghapus: '+err.message+'. Data di server mungkin masih ada.','error');
     renderExpense();
-    toast('Dihapus lokal (Firebase gagal)','warn');
   }finally{hideLoading();}
 }
 
@@ -3956,7 +4359,7 @@ function calcBEPData() {
   // ── Total biaya operasional bulan ini (dari expenses)
   const now   = new Date();
   const mFrom = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
-  const mTo   = now.toISOString().slice(0, 10);
+  const mTo   = today(); // Gunakan tanggal lokal (WIB), bukan UTC
   const monthExp = expenses.filter(e => {
     const d = normalizeDate(e.date);
     return d >= mFrom && d <= mTo;
@@ -3970,7 +4373,7 @@ function calcBEPData() {
 
   // ── Rata-rata penjualan harian dari 30 hari terakhir
   const d30From = new Date(); d30From.setDate(d30From.getDate() - 30);
-  const d30Str  = d30From.toISOString().slice(0, 10);
+  const d30Str  = d30From.getFullYear()+'-'+String(d30From.getMonth()+1).padStart(2,'0')+'-'+String(d30From.getDate()).padStart(2,'0'); // Lokal WIB
   const recentSales = sales.filter(s => getSaleLocalDate(s) >= d30Str);
   const daySet = new Set(recentSales.map(s => getSaleLocalDate(s)));
   const activeDays = daySet.size || 1;
@@ -4203,10 +4606,12 @@ function renderBEPChart(d) {
   // We'll draw BEP marker via a 1-point scatter
   const bepIdx = points.findIndex(c => c >= bepX);
   if (bepIdx >= 0) {
+    // Gunakan index numerik (bukan string label) agar scatter point muncul di posisi yang benar
+    const bepRevenue = Math.round(points[bepIdx] * hariOps * d.avgSellPrice);
     bepChart.data.datasets.push({
       type: 'scatter',
       label: '⬤ BEP Point',
-      data: [{ x: points[bepIdx] + ' cup/hr', y: Math.round(bepX * hariOps * d.avgSellPrice) }],
+      data: [{ x: bepIdx, y: bepRevenue }],
       backgroundColor: '#2a6bc8',
       pointRadius: 7,
       pointStyle: 'triangle',
@@ -4247,8 +4652,17 @@ function renderNeraca(){
 
   const totalPurchase=purchases.reduce((a,p)=>a+Number(p.total||0),0);
   const products=getProducts();
-  const stockValue=products.reduce((a,p)=>a+(Number(p.stock)||0)*(Number(p.buyPrice)||0),0);
-  const stockSellValue=products.reduce((a,p)=>a+(Number(p.stock)||0)*(Number(p.sellPrice)||0),0);
+  // Nilai stok produk manual (tanpa resep saja)
+  const stockValue=products.reduce((a,p)=>{
+    const resep=(cache.resep[p.id]||[]).filter(r=>r.bbId&&r.qty>0);
+    return a+(resep.length===0?(Number(p.stock)||0)*(Number(p.buyPrice)||0):0);
+  },0);
+  const stockSellValue=products.reduce((a,p)=>{
+    const resep=(cache.resep[p.id]||[]).filter(r=>r.bbId&&r.qty>0);
+    return a+(resep.length===0?(Number(p.stock)||0)*(Number(p.sellPrice)||0):0);
+  },0);
+  // Nilai stok bahan baku
+  const bbStockValue=cache.bahanbaku.reduce((a,b)=>(Number(b.stock)||0)*(Number(b.price)||0)+a,0);
   const isProfit=labaBersih>=0;
 
   document.getElementById('neraca-content').innerHTML=`
@@ -4274,9 +4688,11 @@ function renderNeraca(){
       <div class="card">
         <div class="card-title">Posisi Inventori</div>
         <div class="breakdown-row"><span class="breakdown-label">Total Pembelian Stok</span><span class="breakdown-val red">- ${fmt(totalPurchase)}</span></div>
-        <div class="breakdown-row"><span class="breakdown-label">Nilai Stok (HPP)</span><span class="breakdown-val">${fmt(stockValue)}</span></div>
-        <div class="breakdown-row"><span class="breakdown-label">Nilai Stok (Harga Jual)</span><span class="breakdown-val green">${fmt(stockSellValue)}</span></div>
-        <div class="breakdown-row"><span class="breakdown-label">Potensi Laba Stok</span><span class="breakdown-val green">${fmt(stockSellValue-stockValue)}</span></div>
+        <div class="breakdown-row"><span class="breakdown-label">Nilai Stok Produk (HPP)</span><span class="breakdown-val">${fmt(stockValue)}</span></div>
+        <div class="breakdown-row"><span class="breakdown-label">Nilai Stok Produk (Harga Jual)</span><span class="breakdown-val green">${fmt(stockSellValue)}</span></div>
+        <div class="breakdown-row"><span class="breakdown-label">Nilai Stok Bahan Baku</span><span class="breakdown-val blue">${fmt(bbStockValue)}</span></div>
+        <div class="breakdown-row"><span class="breakdown-label">Total Nilai Aset Stok</span><span class="breakdown-val green">${fmt(stockValue+bbStockValue)}</span></div>
+        <div class="breakdown-row"><span class="breakdown-label">Potensi Laba Stok Produk</span><span class="breakdown-val green">${fmt(stockSellValue-stockValue)}</span></div>
         <hr class="divider">
         <div class="breakdown-row"><span class="breakdown-label">Transaksi Penjualan</span><span class="breakdown-val">${sales.length}×</span></div>
         <div class="breakdown-row"><span class="breakdown-label">PO Pembelian</span><span class="breakdown-val">${purchases.length}×</span></div>
@@ -4304,7 +4720,8 @@ async function uploadToSheets(){
   // Upload laporan penjualan & pembelian
   showLoading('Upload laporan ke Sheets...');
   try {
-    const result = await api('uploadStok'); // pakai endpoint yg ada
+    const result = await api('uploadStok');
+    if(!result.success) throw new Error(result.message||'Gagal upload');
     toast('Laporan berhasil diupload ✓','success');
   } catch(err){ toast('Gagal upload: '+err.message,'error'); }
   finally { hideLoading(); }
@@ -4323,7 +4740,7 @@ async function uploadOpnameToSheets(){
 async function uploadNeracaToSheets(){
   const from=document.getElementById('ner-from').value;
   const to=document.getElementById('ner-to').value;
-  const sales=getSales().filter(s=>(!from||normalizeDate(s.date)>=from)&&(!to||normalizeDate(s.date)<=to));
+  const sales=getSales().filter(s=>(!from||getSaleLocalDate(s)>=from)&&(!to||getSaleLocalDate(s)<=to));
   const totalRevenue=sales.reduce((a,s)=>a+Number(s.total||0),0);
   const hpp=sales.reduce((a,s)=>a+(s.items||[]).reduce((b,i)=>b+(Number(i.buyPrice)||0)*(Number(i.qty)||0),0),0);
   const labaKotor=totalRevenue-hpp;
@@ -4334,6 +4751,7 @@ async function uploadNeracaToSheets(){
       revenue: totalRevenue, hpp, profit: labaKotor,
       margin: totalRevenue>0?((labaKotor/totalRevenue)*100).toFixed(1):0
     });
+    if(!result.success) throw new Error(result.message||'Gagal upload');
     toast('Neraca berhasil diupload ✓','success');
   } catch(err){ toast('Gagal upload: '+err.message,'error'); }
   finally { hideLoading(); }
@@ -4458,7 +4876,12 @@ function openKalibrasiModal(id=null){
   document.getElementById('kalib-beans-list').innerHTML=beans.map(b=>`<option value="${b}">`).join('');
 
   if(id){
-    const k=getKalibrasi().find(x=>x.id===id); if(!k) return;
+    const k=getKalibrasi().find(x=>x.id===id);
+    if(!k){
+      toast('Data kalibrasi tidak ditemukan!','error');
+      editingKalibId=null;
+      return;
+    }
     document.getElementById('kalib-beans').value=k.beans||'';
     document.getElementById('kalib-date').value=k.date||today();
     document.getElementById('kalib-roast').value=k.roast||'';
@@ -4523,7 +4946,19 @@ function calcKalibRatio(){
   if(cin&&yld) parts.push(`Ratio Espresso: 1:${(yld/cin).toFixed(2)}`);
   if(cin&&water) parts.push(`Ratio Brew: 1:${(water/cin).toFixed(1)}`);
   if(time){
-    const tClass=time<20?'🔴 Under-extracted':time>35?'🔴 Over-extracted':'🟢 On target';
+    const metode=(document.getElementById('kalib-metode')?.value||'').toLowerCase();
+    let tClass;
+    if(metode==='espresso'||metode==='ristretto'||metode==='lungo'){
+      tClass=time<22?'🔴 Under-extracted':time>38?'🔴 Over-extracted':'🟢 On target';
+    } else if(metode==='v60'||metode==='pour over'||metode==='chemex'){
+      tClass=time<120?'🔴 Terlalu cepat':time>300?'🔴 Terlalu lama':'🟢 On target';
+    } else if(metode==='french press'||metode==='cold brew'){
+      // French press / cold brew butuh waktu jauh lebih lama — tidak diklasifikasikan
+      tClass=`⏱️ ${time}s`;
+    } else {
+      // Default: gunakan threshold espresso sebagai acuan umum
+      tClass=time<22?'🔴 Under-extracted':time>38?'🔴 Over-extracted':'🟢 On target';
+    }
     parts.push(`Waktu: ${tClass}`);
   }
   el.textContent=parts.join('  ·  ');
@@ -4697,6 +5132,7 @@ function viewKalibrasi(id){
 
 async function quickApprove(id){
   const k=getKalibrasi().find(x=>x.id===id); if(!k) return;
+  const prevStatus=k.status; // simpan status lama untuk rollback
   k.status='approved';
   showLoading('Menyimpan...');
   try {
@@ -4706,7 +5142,10 @@ async function quickApprove(id){
     closeModal('modal-kalib-detail');
     renderKalibrasi();
     toast('Kalibrasi diapprove ✓','success');
-  } catch(err){ toast('Gagal: '+err.message,'error'); }
+  } catch(err){
+    k.status=prevStatus; // rollback mutasi jika API gagal
+    toast('Gagal: '+err.message,'error');
+  }
   finally { hideLoading(); }
 }
 
