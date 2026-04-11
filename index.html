@@ -509,16 +509,17 @@ canvas{width:100%!important}
     </div>
   </div>
   <div class="nav">
-    <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">📊</span> Dashboard</div>
-    <div class="nav-item" onclick="showPage('pos')"><span class="nav-icon">🛒</span> Kasir / POS</div>
-    <div class="nav-item" onclick="showPage('inventory')"><span class="nav-icon">📦</span> Inventori</div>
-    <div class="nav-item" onclick="showPage('purchase')"><span class="nav-icon">🛍️</span> Pembelian</div>
-    <div class="nav-item" onclick="showPage('opname')"><span class="nav-icon">📋</span> Opname Stok</div>
-    <div class="nav-item" onclick="showPage('laporan')"><span class="nav-icon">📈</span> Laporan</div>
-    <div class="nav-item admin-only" id="nav-neraca" onclick="showPage('neraca')"><span class="nav-icon">⚖️</span> Neraca</div>
-    <div class="nav-item admin-only" id="nav-bahanbaku" onclick="showPage('bahanbaku')"><span class="nav-icon">🧪</span> Bahan Baku</div>
-    <div class="nav-item admin-only" id="nav-expense" onclick="showPage('expense')"><span class="nav-icon">💸</span> Pengeluaran</div>
-    <div class="nav-item" id="nav-kalibrasi" onclick="showPage('kalibrasi')"><span class="nav-icon">☕</span> Kalibrasi Beans</div>
+    <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="nav-icon">📊</span> Dashboard</div>
+    <div class="nav-item" data-page="pos" onclick="showPage('pos')"><span class="nav-icon">🛒</span> Kasir / POS</div>
+    <div class="nav-item" data-page="inventory" onclick="showPage('inventory')"><span class="nav-icon">📦</span> Inventori</div>
+    <div class="nav-item" data-page="purchase" onclick="showPage('purchase')"><span class="nav-icon">🛍️</span> Pembelian</div>
+    <div class="nav-item" data-page="opname" onclick="showPage('opname')"><span class="nav-icon">📋</span> Opname Stok</div>
+    <div class="nav-item" data-page="laporan" onclick="showPage('laporan')"><span class="nav-icon">📈</span> Laporan</div>
+    <div class="nav-item admin-only" id="nav-neraca" data-page="neraca" onclick="showPage('neraca')"><span class="nav-icon">⚖️</span> Neraca</div>
+    <div class="nav-item admin-only" id="nav-bahanbaku" data-page="bahanbaku" onclick="showPage('bahanbaku')"><span class="nav-icon">🧪</span> Bahan Baku</div>
+    <div class="nav-item admin-only" id="nav-expense" data-page="expense" onclick="showPage('expense')"><span class="nav-icon">💸</span> Pengeluaran</div>
+    <div class="nav-item" id="nav-kalibrasi" data-page="kalibrasi" onclick="showPage('kalibrasi')"><span class="nav-icon">☕</span> Kalibrasi Beans</div>
+    <div class="nav-item admin-only" data-page="settings" onclick="showPage('settings')"><span class="nav-icon">⚙️</span> Pengaturan</div>
   </div>
   <div class="main" id="main-content">
 
@@ -591,7 +592,7 @@ canvas{width:100%!important}
             </div>
             <div class="discount-row">
               <input class="input input-sm" type="number" id="discount-input" placeholder="Diskon (Rp)" min="0" oninput="updateCartTotals()" style="flex:1">
-              <select class="input input-sm" id="discount-type" onchange="updateCartTotals()" style="width:80px">
+              <select class="input input-sm" id="discount-type" onchange="onDiscountTypeChange()" style="width:80px">
                 <option value="rp">Rp</option>
                 <option value="pct">%</option>
               </select>
@@ -686,7 +687,7 @@ canvas{width:100%!important}
     <!-- OPNAME -->
     <div class="page" id="page-opname">
       <div class="section-header">
-        <div><div class="section-title">Opname Stok</div><div class="section-sub">Rekonsiliasi stok sistem vs stok fisik</div></div>
+        <div><div class="section-title">Opname Stok</div><div class="section-sub">Rekonsiliasi stok sistem vs stok fisik — Produk & Bahan Baku</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="refreshPage('opname')">↻ Refresh</button>
           <button class="btn btn-secondary" onclick="resetOpname()">↺ Reset</button>
@@ -696,6 +697,11 @@ canvas{width:100%!important}
       <div class="alert alert-info">📌 Masukkan jumlah stok fisik yang dihitung. Sistem akan menampilkan selisih antara stok sistem dan stok fisik.</div>
       <div id="opname-history-btn" style="margin-bottom:12px">
         <button class="btn btn-secondary btn-sm" onclick="showOpnameHistory()">📋 Riwayat Opname</button>
+      </div>
+      <!-- Opname Tabs -->
+      <div class="report-tabs" style="margin-bottom:16px">
+        <div class="report-tab active" id="opname-tab-produk" onclick="showOpnameTab('produk',this)">📦 Produk</div>
+        <div class="report-tab" id="opname-tab-bb" onclick="showOpnameTab('bb',this)">🧪 Bahan Baku</div>
       </div>
       <div id="opname-list"></div>
     </div>
@@ -936,6 +942,127 @@ canvas{width:100%!important}
       <div id="kalib-list"></div>
     </div>
 
+    <!-- PAGE PENGATURAN (Admin Only) -->
+    <div class="page" id="page-settings">
+      <div class="section-header">
+        <div>
+          <div class="section-title">⚙️ Pengaturan</div>
+          <div class="section-sub">Konfigurasi nama toko, struk, dan preferensi sistem</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="renderSettings()">↻ Refresh</button>
+          <button class="btn btn-success" onclick="saveStrukSettings()">💾 Simpan Pengaturan</button>
+        </div>
+      </div>
+
+      <div class="grid-2" style="gap:16px">
+        <!-- Identitas Toko -->
+        <div class="card">
+          <div class="card-title">🏪 Identitas Toko</div>
+          <div class="input-group">
+            <label class="input-label">Nama Toko</label>
+            <input class="input" id="set-nama-toko" placeholder="Contoh: SANA COFFEE">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Tagline / Sub-judul</label>
+            <input class="input" id="set-tagline" placeholder="Contoh: Sana Coffee · Point of Sale">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Alamat Toko</label>
+            <input class="input" id="set-alamat" placeholder="Contoh: Jl. Raya No. 1, Batam">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Nomor Telepon</label>
+            <input class="input" id="set-telp" placeholder="Contoh: 0812-3456-7890">
+          </div>
+        </div>
+
+        <!-- Pengaturan Struk -->
+        <div class="card">
+          <div class="card-title">🧾 Pengaturan Struk</div>
+          <div class="input-group">
+            <label class="input-label">Header Kustom (opsional)</label>
+            <textarea class="input" id="set-header-custom" placeholder="Teks tambahan di atas struk. Gunakan Enter untuk multi-baris." style="min-height:64px"></textarea>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Footer / Pesan Penutup</label>
+            <textarea class="input" id="set-footer-custom" placeholder="Contoh: Terima kasih atas kunjungan Anda!" style="min-height:64px"></textarea>
+          </div>
+          <div class="input-group" style="margin-bottom:0">
+            <label class="input-label">Delay Print Rangkap 2 (detik)</label>
+            <input class="input" type="number" id="set-delay-rangkap2" placeholder="8" min="0" max="30">
+            <div style="font-size:11px;color:var(--ink3);margin-top:4px">Jeda antara print rangkap 1 dan 2 untuk thermal printer. Default: 8 detik.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview Struk -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">👁️ Preview Struk</div>
+        <div class="grid-2" style="gap:16px;align-items:start">
+          <!-- Preview Rangkap 1 -->
+          <div>
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink2);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+              📄 Rangkap 1 — Struk Pelanggan
+            </div>
+            <!-- Upload / Ambil Foto -->
+            <div style="margin-bottom:12px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3);margin-bottom:6px">📷 Foto / Gambar (opsional, khusus Rangkap 1)</div>
+
+              <!-- Tombol aksi foto -->
+              <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <button class="btn btn-secondary btn-sm" onclick="bukaKameraSettings()" id="btn-kamera-settings">📸 Ambil Foto</button>
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('foto-input').click()">🖼️ Upload File</button>
+                <button class="btn btn-danger btn-sm" id="btn-hapus-foto-settings" style="display:none" onclick="hapusFoto()">✕ Hapus Foto</button>
+              </div>
+              <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="handleFotoUpload(this)">
+
+              <!-- Panel kamera di settings -->
+              <div id="settings-kamera-panel" style="display:none;border-radius:10px;overflow:hidden;border:2px solid var(--accent2);background:#000;position:relative;margin-bottom:8px">
+                <video id="settings-kamera-video" autoplay playsinline style="width:100%;display:block;max-height:220px;object-fit:cover"></video>
+                <div style="position:absolute;bottom:0;left:0;right:0;padding:8px;display:flex;justify-content:center;gap:8px;background:linear-gradient(transparent,rgba(0,0,0,.75))">
+                  <button class="btn btn-success" onclick="jepretFotoSettings()" style="font-size:20px;width:50px;height:50px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center" title="Jepret">⚡</button>
+                  <button class="btn btn-secondary btn-sm" onclick="gantiKameraSettings()" id="btn-ganti-kamera-settings" style="font-size:12px" title="Ganti kamera">🔄</button>
+                  <button class="btn btn-danger btn-sm" onclick="tutupKameraSettings()">✕ Tutup</button>
+                </div>
+              </div>
+              <canvas id="settings-kamera-canvas" style="display:none"></canvas>
+
+              <!-- Area preview foto -->
+              <div id="foto-upload-area" style="border:2px dashed var(--border);border-radius:8px;padding:12px;text-align:center;background:var(--bg)">
+                <div id="foto-placeholder" style="font-size:12px;color:var(--ink3)">
+                  🖼️ Belum ada foto &nbsp;·&nbsp; <span style="font-size:10px">gunakan tombol di atas untuk ambil atau upload</span>
+                </div>
+                <div id="foto-preview-wrap" style="display:none">
+                  <canvas id="foto-canvas-bw" style="max-width:100%;border-radius:6px;border:1px solid var(--border)"></canvas>
+                  <div style="margin-top:6px">
+                    <span style="font-size:10px;color:var(--accent3);font-weight:600">✓ Hitam putih — siap thermal</span>
+                  </div>
+                </div>
+              </div>
+              <div style="font-size:10px;color:var(--ink3);margin-top:4px">Foto muncul di bagian atas Rangkap 1 saat cetak thermal.</div>
+            </div>
+            <div id="settings-struk-preview-1" style="max-width:320px;margin:0 auto"></div>
+          </div>
+          <!-- Preview Rangkap 2 -->
+          <div>
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink2);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+              📋 Rangkap 2 — Dapur / Arsip
+            </div>
+            <div style="font-size:11px;color:var(--ink3);margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:6px">Ringkas: hanya nama item & qty, tanpa harga detail. Tanpa foto.</div>
+            <div id="settings-struk-preview-2" style="max-width:320px;margin:0 auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Akun -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">👤 Informasi Akun Aktif</div>
+        <div id="settings-user-info" style="font-size:13px;color:var(--ink2);line-height:2"></div>
+        <div class="alert alert-info" style="margin-top:12px">ℹ️ Untuk mengelola pengguna (tambah/ubah/hapus akun), akses langsung ke Firebase Console → Collection <strong>users</strong>.</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1063,6 +1190,36 @@ canvas{width:100%!important}
       <button class="close-btn" onclick="closeModal('modal-receipt')">✕</button>
     </div>
     <div class="modal-body">
+      <!-- Upload Foto untuk Rangkap 1 -->
+      <div id="receipt-foto-section" style="margin-bottom:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink2);margin-bottom:8px">📷 Foto Rangkap 1 (opsional)</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div id="receipt-foto-thumb" style="display:none;position:relative">
+            <canvas id="receipt-foto-canvas" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block"></canvas>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div id="receipt-foto-placeholder" style="font-size:12px;color:var(--ink3)">Belum ada foto. Klik tombol untuk upload.</div>
+            <div id="receipt-foto-info" style="display:none;font-size:11px;color:var(--accent3);font-weight:600">✓ Foto aktif — akan tercetak di Rangkap 1 (hitam putih)</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="bukaKamera()" id="btn-buka-kamera">📸 Ambil Foto</button>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('receipt-foto-input').click()">🖼️ Upload</button>
+            <button class="btn btn-danger btn-sm" id="receipt-foto-hapus-btn" style="display:none" onclick="hapusFotoReceipt()">✕ Hapus</button>
+          </div>
+          <input type="file" id="receipt-foto-input" accept="image/*" style="display:none" onchange="handleFotoReceipt(this)">
+        </div>
+      </div>
+
+      <!-- Panel Kamera Langsung -->
+      <div id="kamera-panel" style="display:none;margin-bottom:12px;border-radius:10px;overflow:hidden;border:2px solid var(--accent2);background:#000;position:relative">
+        <video id="kamera-video" autoplay playsinline style="width:100%;display:block;max-height:260px;object-fit:cover"></video>
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:10px;display:flex;justify-content:center;gap:10px;background:linear-gradient(transparent,rgba(0,0,0,.7))">
+          <button class="btn btn-success" onclick="jepretFoto()" style="font-size:18px;width:52px;height:52px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center" title="Jepret">⚡</button>
+          <button class="btn btn-secondary btn-sm" onclick="gantikamera()" id="btn-ganti-kamera" style="font-size:13px" title="Ganti kamera depan/belakang">🔄</button>
+          <button class="btn btn-danger btn-sm" onclick="tutupKamera()" style="font-size:13px">✕ Tutup</button>
+        </div>
+      </div>
+      <canvas id="kamera-canvas" style="display:none"></canvas>
       <div id="receipt-content"></div>
     </div>
     <div class="modal-footer" style="flex-wrap:wrap;gap:8px">
@@ -1193,7 +1350,7 @@ canvas{width:100%!important}
         <div>
           <div class="input-group">
             <label class="input-label">Stok Awal *</label>
-            <input class="input" type="number" id="bb-stock" placeholder="0" min="0">
+            <input class="input" type="number" id="bb-stock" placeholder="0" min="0" oninput="updateBBCostPreview()">
           </div>
           <div class="input-group">
             <label class="input-label">Stok Minimum (Alert)</label>
@@ -1201,7 +1358,7 @@ canvas{width:100%!important}
           </div>
           <div class="input-group">
             <label class="input-label">Harga per Satuan (Rp)</label>
-            <input class="input" type="number" id="bb-price" placeholder="0" min="0">
+            <input class="input" type="number" id="bb-price" placeholder="0" min="0" oninput="updateBBCostPreview()">
             <div style="font-size:11px;color:var(--ink3);margin-top:4px">Digunakan untuk hitung HPP bahan baku per produk</div>
           </div>
           <div id="bb-cost-preview" style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:8px;display:none">
@@ -1634,16 +1791,54 @@ async function api(action, payload={}) {
     case 'saveSale': {
       const s = payload.sale;
       await db.collection('sales').doc(s.id).set(s);
-      // Hanya update stock produk yang TIDAK punya resep (hasResep=false)
-      // Produk berresep: stoknya dikontrol oleh BB, bukan p.stock
+
       const batch = db.batch();
       let hasBatchOp = false;
+
+      // Update stok produk manual (tidak punya resep)
       for(const item of (s.items||[])){
         if(!item.hasResep){
           batch.update(db.collection('products').doc(item.productId), {stock: item.newStock});
           hasBatchOp = true;
         }
       }
+
+      // BUG FIX: Deduct stok bahan baku di Firestore untuk produk berresep
+      // Ambil resep semua produk berresep dalam satu query, lalu kurangi stok BB
+      const resepItems = (s.items||[]).filter(i => i.hasResep);
+      if(resepItems.length > 0){
+        // Fetch resep dari Firestore
+        const resepSnap = await db.collection('resep').get();
+        const resepMap = {};
+        resepSnap.docs.forEach(d => { resepMap[d.id] = d.data().items || []; });
+
+        // M1 FIX: Akumulasi TOTAL kebutuhan semua BB dari semua item dulu,
+        // BARU fetch stok masing-masing BB sekali → tidak ada race condition
+        // jika 2+ produk berbagi BB yang sama.
+        const bbNeeded = {}; // bbId -> totalQtyUsed
+        for(const item of resepItems){
+          const resep = (resepMap[item.productId] || []).filter(r => r.bbId && Number(r.qty) > 0);
+          for(const r of resep){
+            bbNeeded[r.bbId] = (bbNeeded[r.bbId] || 0) + (Number(r.qty) * Number(item.qty));
+          }
+        }
+
+        // Fetch semua BB yang dibutuhkan secara paralel, lalu masukkan ke batch
+        const bbEntries = Object.entries(bbNeeded);
+        const bbSnaps = await Promise.all(
+          bbEntries.map(([bbId]) => db.collection('bahanbaku').doc(bbId).get())
+        );
+        const updatedAt = new Date().toISOString();
+        bbSnaps.forEach((bbSnap, idx) => {
+          if(!bbSnap.exists) return;
+          const [bbId, qtyUsed] = bbEntries[idx];
+          const currentStock = Number(bbSnap.data().stock || 0);
+          const newBBStock = Math.max(0, currentStock - qtyUsed);
+          batch.update(db.collection('bahanbaku').doc(bbId), { stock: newBBStock, updatedAt });
+          hasBatchOp = true;
+        });
+      }
+
       if(hasBatchOp) await batch.commit();
       return {success:true};
     }
@@ -1683,10 +1878,18 @@ async function api(action, payload={}) {
       const o = payload.opname;
       await db.collection('opname').doc(o.id).set(o);
       const batch = db.batch();
+      let hasBatch = false;
       for(const a of (o.adjustments||[])){
-        batch.update(db.collection('products').doc(a.productId), {stock: a.after});
+        if(a.type === 'bb'){
+          // Opname bahan baku → update collection bahanbaku
+          batch.update(db.collection('bahanbaku').doc(a.id), {stock: a.after, updatedAt: new Date().toISOString()});
+        } else {
+          // Opname produk → update collection products
+          batch.update(db.collection('products').doc(a.productId), {stock: a.after});
+        }
+        hasBatch = true;
       }
-      await batch.commit();
+      if(hasBatch) await batch.commit();
       return {success:true};
     }
     case 'getBahanBaku': {
@@ -1744,6 +1947,10 @@ async function api(action, payload={}) {
       await db.collection('kalibrasi').doc(payload.id).delete();
       return { success: true };
     }
+    case 'saveSettings': {
+      await db.collection('settings').doc('struk').set(payload.settings);
+      return { success: true };
+    }
     default:
       return {success:false, message:'Action tidak dikenal: '+action};
   }
@@ -1780,9 +1987,9 @@ function getSaleLocalDate(s){
   if(ds && /^\d{4}-\d{2}-\d{2}/.test(ds)) return ds.slice(0,10);
   return '';
 }
-function getProducts(){return cache.products}
-function getSales(){return cache.sales}
-function getPurchases(){return cache.purchases}
+function getProducts(){return cache.products||[]}
+function getSales(){return cache.sales||[]}
+function getPurchases(){return cache.purchases||[]} // BUG FIX: null-guard jika cache belum dimuat
 
 // ===================== TOAST =====================
 function toast(msg,type='success'){
@@ -1797,7 +2004,10 @@ function toast(msg,type='success'){
 
 // ===================== MODAL =====================
 function openModal(id){document.getElementById(id).classList.remove('hidden')}
-function closeModal(id){document.getElementById(id).classList.add('hidden')}
+function closeModal(id){
+  document.getElementById(id).classList.add('hidden');
+  if(id==='modal-receipt' && typeof kameraStream!=='undefined' && kameraStream){ tutupKamera(); }
+}
 
 // ===================== CLOCK =====================
 function startClock(){
@@ -1826,19 +2036,24 @@ async function doLogin(){
       document.getElementById('app').classList.add('visible');
       document.getElementById('user-display').textContent = currentUser.name;
       document.getElementById('user-avatar').textContent = (currentUser.name||'U')[0].toUpperCase();
-      // Tampilkan elemen admin-only
-      document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdminUser()?'flex':'none');
+      // FIX: tampilkan elemen admin-only dengan display yang sesuai konteks element
+      document.querySelectorAll('.admin-only').forEach(el=>{
+        if(!isAdminUser()){ el.style.display='none'; return; }
+        // nav-item pakai flex; div/span default pakai block
+        el.style.display = el.classList.contains('nav-item') ? 'flex' : 'block';
+      });
       startClock();
       // Muat semua data dulu, BARU render dashboard
       showLoading('Memuat data...');
       await Promise.all([loadAllData(true), loadStrukSettings()]);
       loadBahanBakuLocal();
       hideLoading();
-      // Aktifkan halaman dashboard
+      // Aktifkan halaman dashboard menggunakan data-page selector
       document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
       document.getElementById('page-dashboard').classList.add('active');
-      document.querySelectorAll('.nav-item')[0].classList.add('active');
+      const dashNav = document.querySelector('.nav-item[data-page="dashboard"]');
+      if(dashNav) dashNav.classList.add('active');
       renderDashboard();
       toast('Selamat datang, '+currentUser.name+' ✓','success');
     } else {
@@ -1865,8 +2080,17 @@ function doLogout(){
   cart=[]; selectedPayment='tunai'; posCategory='';
   if(chartSales){chartSales.destroy();chartSales=null;}
   if(bepChart){bepChart.destroy();bepChart=null;}
-  // Putus koneksi Bluetooth jika ada
-  if(btDevice){try{btDevice.gatt.disconnect();}catch(e){} btDevice=null; btCharacteristic=null;}
+  // BUG FIX: Reset admin-only elements ke hidden agar tidak bocor ke sesi berikutnya
+  document.querySelectorAll('.admin-only').forEach(el=>el.style.display='none');
+  // MD2 FIX: Null refs dulu sebelum disconnect async agar tidak ada kode lain
+  // yang sempat pakai btDevice/btCharacteristic setelah logout dimulai.
+  // Disconnect di-wrap Promise + .catch() agar tidak throw uncaught rejection
+  // jika GATT sudah disconnected atau printer sedang kirim data.
+  if(btDevice){
+    const _dev = btDevice;
+    btDevice = null; btCharacteristic = null;
+    Promise.resolve().then(()=>_dev.gatt.disconnect()).catch(()=>{});
+  }
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-user').value='';
@@ -1948,6 +2172,7 @@ async function refreshData(){
   else if(p==='bahanbaku') renderBahanBakuPage();
   else if(p==='expense') renderExpense();
   else if(p==='kalibrasi') renderKalibrasi();
+  else if(p==='settings'){await loadStrukSettings();renderSettings();}
   toast('Data diperbarui ✓','success');
 }
 
@@ -1964,46 +2189,28 @@ async function refreshPage(p){
   else if(p==='bahanbaku') renderBahanBakuPage();
   else if(p==='expense'){setExpenseRange('month');renderExpense();}
   else if(p==='kalibrasi') renderKalibrasi();
+  else if(p==='settings'){await loadStrukSettings();renderSettings();}
   toast('Data diperbarui ✓','success');
 }
 
 // ===================== NAV =====================
 async function showPage(p){
-  // Guard: neraca hanya untuk admin
-  if(p==='neraca' && !isAdminUser()){
-    toast('Akses ditolak. Halaman Neraca hanya untuk Admin.','error');
+  // Tutup kamera settings jika pindah halaman
+  if(typeof kameraSettingsStream!=='undefined' && kameraSettingsStream){ tutupKameraSettings(); }
+  // Guard: halaman admin-only
+  const adminPages = ['neraca','bahanbaku','expense','settings'];
+  if(adminPages.includes(p) && !isAdminUser()){
+    toast('Akses ditolak. Halaman ini hanya untuk Admin.','error');
     return;
   }
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
-  document.getElementById('page-'+p).classList.add('active');
-  // Hanya set active untuk nav-item yang punya ID eksplisit di pages standar
-  // nav bahanbaku, expense, kalibrasi menggunakan ID element langsung
-  const pageToNavId = {
-    dashboard : null,   // akan diambil via querySelectorAll index 0
-    pos       : null,
-    inventory : null,
-    purchase  : null,
-    opname    : null,
-    laporan   : null,
-    bahanbaku : 'nav-bahanbaku',
-    expense   : 'nav-expense',
-    kalibrasi : 'nav-kalibrasi',
-  };
-  // neraca tidak punya nav-item tersendiri di HTML (bisa admin-only hidden),
-  // fallback ke index-based jika ada
-  if(pageToNavId[p] !== undefined && pageToNavId[p] !== null){
-    const navEl = document.getElementById(pageToNavId[p]);
-    if(navEl) navEl.classList.add('active');
-  } else {
-    // Pages standar: dashboard=0, pos=1, inventory=2, purchase=3, opname=4, laporan=5
-    const stdPages=['dashboard','pos','inventory','purchase','opname','laporan','neraca'];
-    const idx=stdPages.indexOf(p);
-    if(idx>=0){
-      const navItems=document.querySelectorAll('.nav-item');
-      if(navItems[idx]) navItems[idx].classList.add('active');
-    }
-  }
+  const pageEl = document.getElementById('page-'+p);
+  if(!pageEl){ console.warn('Page tidak ditemukan:', p); return; }
+  pageEl.classList.add('active');
+  // FIX: gunakan data-page attribute — tidak tergantung urutan/index DOM
+  const navEl = document.querySelector(`.nav-item[data-page="${p}"]`);
+  if(navEl) navEl.classList.add('active');
 
   // Render dari cache langsung (instan) — klik Refresh jika mau data terbaru
   if(p==='dashboard') renderDashboard();
@@ -2016,6 +2223,7 @@ async function showPage(p){
   else if(p==='bahanbaku') renderBahanBakuPage();
   else if(p==='expense'){setExpenseRange('month');renderExpense();}
   else if(p==='kalibrasi') renderKalibrasi();
+  else if(p==='settings') renderSettings();
 }
 
 // ===================== DASHBOARD =====================
@@ -2047,7 +2255,12 @@ function fmtDatetime(d){
 }
 function fmtDateOnly(d){
   const s=normalizeDate(d); if(!s) return '-';
-  return new Date(s+'T12:00:00').toLocaleDateString('id-ID');
+  // MN5 FIX: Hindari T12:00:00 trick yang bisa overflow ke hari berikutnya di
+  // timezone UTC+12 ke atas. Parse bagian tanggal secara eksplisit menggunakan
+  // konstruktor Date(year, month-1, day) yang selalu menggunakan waktu lokal.
+  const [y,m,day]=s.split('-').map(Number);
+  if(!y||!m||!day) return '-';
+  return new Date(y, m-1, day).toLocaleDateString('id-ID');
 }
 
 function renderDashboard(){
@@ -2107,7 +2320,7 @@ function renderDashboard(){
 
   // Top products
   const prodSales={};
-  sales.forEach(s=>s.items.forEach(i=>{
+  sales.forEach(s=>(s.items||[]).forEach(i=>{ // BUG FIX: null-guard
     if(!prodSales[i.productId]) prodSales[i.productId]={name:i.productName,qty:0,rev:0};
     prodSales[i.productId].qty+=i.qty; prodSales[i.productId].rev+=i.subtotal;
   }));
@@ -2170,16 +2383,20 @@ function setPosCategory(c,el){
   document.querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');filterPOS();
 }
+let _filterPOSTimer = null;
 function filterPOS(){
-  const q=(document.getElementById('pos-search').value||'').toLowerCase();
-  const products=getProducts().filter(p=>{
-    const matchCat=!posCategory||p.category===posCategory;
-    const matchQ=!q||p.name.toLowerCase().includes(q)||(p.code||'').toLowerCase().includes(q);
-    return matchCat&&matchQ;
-  });
-
-  // Refresh BB dari Firestore dulu, lalu hitung ATS (async)
-  refreshBBThenRenderPOS(products, q);
+  // BUG FIX: debounce 300ms agar tidak flood Firestore setiap keystroke
+  if(_filterPOSTimer) clearTimeout(_filterPOSTimer);
+  _filterPOSTimer = setTimeout(()=>{
+    const q=(document.getElementById('pos-search').value||'').toLowerCase();
+    const products=getProducts().filter(p=>{
+      const matchCat=!posCategory||p.category===posCategory;
+      const matchQ=!q||p.name.toLowerCase().includes(q)||(p.code||'').toLowerCase().includes(q);
+      return matchCat&&matchQ;
+    });
+    // Refresh BB dari Firestore dulu, lalu hitung ATS (async)
+    refreshBBThenRenderPOS(products, q);
+  }, 300);
 }
 
 async function refreshBBThenRenderPOS(products, q){
@@ -2335,7 +2552,17 @@ function changeQty(id,delta){
   renderCart();updateCartTotals();
 }
 function removeFromCart(id){cart=cart.filter(c=>c.id!==id);renderCart();updateCartTotals();}
-function clearCart(){cart=[];document.getElementById('discount-input').value='';renderCart();updateCartTotals();}
+function clearCart(){
+  cart=[];
+  document.getElementById('discount-input').value='';
+  // MN4 FIX: Reset customer-name dan change-display saat keranjang dikosongkan,
+  // konsisten dengan reset yang dilakukan setelah checkout berhasil.
+  document.getElementById('customer-name').value='';
+  document.getElementById('change-display').innerHTML='';
+  resetQuickCash();
+  renderCart();
+  updateCartTotals();
+}
 function renderCart(){
   const body=document.getElementById('cart-body');
   if(cart.length===0){
@@ -2358,7 +2585,9 @@ function updateCartTotals(){
   const subtotal=cart.reduce((a,c)=>a+c.subtotal,0);
   const discVal=parseFloat(document.getElementById('discount-input').value)||0;
   const discType=document.getElementById('discount-type').value;
-  const disc=discType==='pct'?Math.round(subtotal*discVal/100):discVal;
+  // M4 FIX: Clamp diskon agar tidak melebihi subtotal (persen max 100, nominal max subtotal)
+  const discRaw=discType==='pct'?Math.round(subtotal*Math.min(100,Math.max(0,discVal))/100):Math.max(0,discVal);
+  const disc=Math.min(discRaw,subtotal);
   const total=Math.max(0,subtotal-disc);
   document.getElementById('cart-subtotal').textContent=fmt(subtotal);
   document.getElementById('cart-disc-display').textContent=fmt(disc);
@@ -2372,6 +2601,17 @@ function setPayment(m){
   document.getElementById('cash-input-wrap').style.display=m==='tunai'?'block':'none';
   if(m!=='tunai'){document.getElementById('cash-input').value='';document.getElementById('change-display').innerHTML='';resetQuickCash();}
   else updateChange();
+}
+// MD3 FIX: Reset nilai diskon saat ganti tipe (Rp ↔ %) agar nilai lama tidak
+// langsung di-apply ke tipe baru dan menghasilkan total yang salah tanpa warning.
+// Juga update placeholder agar kasir tahu satuan yang aktif.
+function onDiscountTypeChange(){
+  const inp = document.getElementById('discount-input');
+  const type = document.getElementById('discount-type').value;
+  inp.value = '';
+  inp.placeholder = type === 'pct' ? 'Diskon (%)' : 'Diskon (Rp)';
+  inp.max = type === 'pct' ? '100' : '';
+  updateCartTotals();
 }
 function updateChange(){
   const total=getCartTotal();
@@ -2427,13 +2667,17 @@ function getCartTotal(){
   const sub=cart.reduce((a,c)=>a+c.subtotal,0);
   const dv=parseFloat(document.getElementById('discount-input').value)||0;
   const dt=document.getElementById('discount-type').value;
-  return Math.max(0,sub-(dt==='pct'?Math.round(sub*dv/100):dv));
+  // M4 FIX: Clamp agar konsisten dengan updateCartTotals
+  const discRaw=dt==='pct'?Math.round(sub*Math.min(100,Math.max(0,dv))/100):Math.max(0,dv);
+  return Math.max(0,sub-Math.min(discRaw,sub));
 }
 function getCartDisc(){
   const sub=cart.reduce((a,c)=>a+c.subtotal,0);
   const dv=parseFloat(document.getElementById('discount-input').value)||0;
   const dt=document.getElementById('discount-type').value;
-  return dt==='pct'?Math.round(sub*dv/100):dv;
+  // M4 FIX: Clamp agar nilai yang tersimpan ke Firestore selalu valid (tidak negatif / tidak > subtotal)
+  const discRaw=dt==='pct'?Math.round(sub*Math.min(100,Math.max(0,dv))/100):Math.max(0,dv);
+  return Math.min(discRaw,sub);
 }
 
 async function checkout(){
@@ -2463,11 +2707,13 @@ async function checkout(){
       cashier:currentUser.name, cashierRole:currentUser.role,
       items:cart.map(c=>{
         const p=getProducts().find(x=>x.id===c.id);
+        // M3 FIX: Guard jika produk tidak ditemukan di cache (misal dihapus saat kasir buka)
+        const pStock = p ? Number(p.stock) : 0;
         const resep=(cache.resep[c.id]||[]).filter(r=>r.bbId&&r.qty>0);
         const hasResepItem = resep.length > 0;
         // Produk berresep: stock produk tidak dikurangi (yang dikurangi BB via backend)
         // Produk manual: kurangi p.stock
-        const newStock = hasResepItem ? (p?p.stock:0) : Math.max(0,(p?p.stock:0)-c.qty);
+        const newStock = hasResepItem ? pStock : Math.max(0, pStock - c.qty);
         return {productId:c.id,productName:c.name,qty:c.qty,sellPrice:c.price,buyPrice:c.buyPrice||0,subtotal:c.subtotal,newStock,hasResep:hasResepItem};
       })
     };
@@ -2526,13 +2772,17 @@ async function showReceipt(sale){
   await loadStrukSettings();
   // Refresh BT status indicator whenever receipt opens
   setTimeout(()=>updateBtStatus(!!btCharacteristic, btDevice?btDevice.name:''),100);
-  const change=sale.change>0?`<div class="receipt-row"><span>Kembalian</span><span>${fmt(sale.change)}</span></div>`:'';
   // Baris header kustom (multi-line support)
   const headerLines=(strukCfg.header_custom||'').split('\n').filter(Boolean).map(l=>`<div class="receipt-center"><small>${l}</small></div>`).join('');
   // Baris footer kustom (multi-line support)
   const footerLines=(strukCfg.footer_custom||'Terima kasih atas kunjungan Anda!').split('\n').filter(Boolean).map(l=>`<div class="receipt-center"><small>${l}</small></div>`).join('');
+  // Foto rangkap 1 (B&W)
+  const fotoHtmlReceipt = strukFotoBwDataUrl
+    ? `<div style="text-align:center;margin:6px 0"><img src="${strukFotoBwDataUrl}" style="max-width:100%;filter:grayscale(1) contrast(1.1);border-radius:4px"></div><div class="receipt-line"></div>`
+    : '';
   document.getElementById('receipt-content').innerHTML=`
     <div class="receipt">
+      ${fotoHtmlReceipt}
       <div class="receipt-center"><strong style="font-size:16px">${strukCfg.nama_toko||'SANA COFFEE'}</strong></div>
       ${strukCfg.tagline?`<div class="receipt-center"><small>${strukCfg.tagline}</small></div>`:''}
       ${strukCfg.alamat?`<div class="receipt-center"><small>${strukCfg.alamat}</small></div>`:''}
@@ -2544,17 +2794,21 @@ async function showReceipt(sale){
       <div class="receipt-row"><span>Kasir</span><span>${sale.cashier}</span></div>
       <div class="receipt-row"><span>Pelanggan</span><span>${sale.customer}</span></div>
       <div class="receipt-line"></div>
-      ${sale.items.map(i=>`<div class="receipt-row"><span>${i.productName}</span><span></span></div><div class="receipt-row"><span>&nbsp;&nbsp;${i.qty} \xd7 ${fmt(i.sellPrice)}</span><span>${fmt(i.subtotal)}</span></div>`).join('')}
+      ${(sale.items||[]).map(i=>`<div class="receipt-row"><span>${i.productName}</span><span></span></div><div class="receipt-row"><span>&nbsp;&nbsp;${i.qty} \xd7 ${fmt(i.sellPrice)}</span><span>${fmt(i.subtotal)}</span></div>`).join('')}
       <div class="receipt-line"></div>
       <div class="receipt-row"><span>Subtotal</span><span>${fmt(sale.subtotal)}</span></div>
       ${sale.discount>0?`<div class="receipt-row"><span>Diskon</span><span>- ${fmt(sale.discount)}</span></div>`:''}
       <div class="receipt-row"><strong>TOTAL</strong><strong>${fmt(sale.total)}</strong></div>
-      ${sale.payment==='tunai'?`<div class="receipt-row"><span>TUNAI</span><span>${fmt(sale.total+sale.change)}</span></div>`:`<div class="receipt-row"><span>${sale.payment.toUpperCase()}</span><span>—</span></div>`}
-      ${change}
+      ${sale.payment==='tunai'
+        ? `<div class="receipt-row"><span>Dibayar (Tunai)</span><span>${fmt(sale.total + Math.max(0, sale.change||0))}</span></div>`
+        : `<div class="receipt-row"><span>Dibayar (${(sale.payment||'').toUpperCase()})</span><span>${fmt(sale.total)}</span></div>`
+      }
+      ${(sale.change > 0) ? `<div class="receipt-row"><span>Kembalian</span><span>${fmt(sale.change)}</span></div>` : ''}
       <div class="receipt-line"></div>
       ${footerLines}
     </div>`;
   openModal('modal-receipt');
+  syncReceiptFotoUI();
 }
 function printReceipt(){
   // Salin konten struk ke print-area agar @media print bisa menampilkannya
@@ -2834,6 +3088,80 @@ async function printThermal(){
   }
 }
 
+// ── Konversi foto B&W ke ESC/POS raster image bytes ──
+async function fotoToEscPos(dataUrl){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = function(){
+      // Lebar printer thermal 58mm = 384px, atau 80mm = 576px
+      // Gunakan 384px sebagai default (kompatibel dengan kebanyakan thermal)
+      const printerW = 384;
+      const scale = Math.min(1, printerW / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width  = printerW; // selalu lebar penuh printer
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Center gambar
+      const xOffset = Math.floor((printerW - w) / 2);
+      ctx.drawImage(img, xOffset, 0, w, h);
+      // Grayscale + threshold untuk dithering sederhana
+      const imgData = ctx.getImageData(0, 0, printerW, h);
+      const d = imgData.data;
+      // Floyd-Steinberg dithering untuk hasil lebih baik
+      for(let y=0;y<h;y++){
+        for(let x=0;x<printerW;x++){
+          const idx = (y*printerW+x)*4;
+          const gray = Math.round(d[idx]*0.299 + d[idx+1]*0.587 + d[idx+2]*0.114);
+          const newVal = gray < 128 ? 0 : 255;
+          const err = gray - newVal;
+          d[idx]=d[idx+1]=d[idx+2]=newVal;
+          // Diffuse error ke tetangga
+          const spread = [[x+1,y,7/16],[x-1,y+1,3/16],[x,y+1,5/16],[x+1,y+1,1/16]];
+          spread.forEach(([nx,ny,frac])=>{
+            if(nx>=0&&nx<printerW&&ny<h){
+              const ni=(ny*printerW+nx)*4;
+              d[ni]=Math.min(255,Math.max(0,d[ni]+err*frac));
+              d[ni+1]=Math.min(255,Math.max(0,d[ni+1]+err*frac));
+              d[ni+2]=Math.min(255,Math.max(0,d[ni+2]+err*frac));
+            }
+          });
+        }
+      }
+      ctx.putImageData(imgData,0,0);
+      // Build ESC/POS raster bitmap bytes
+      // GS v 0 — raster bit image
+      const bytes = [];
+      const bytesPerRow = Math.ceil(printerW / 8);
+      // GS v 0 header
+      bytes.push(0x1D, 0x76, 0x30, 0x00); // GS v 0 (normal)
+      bytes.push(bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF); // xL xH
+      bytes.push(h & 0xFF, (h >> 8) & 0xFF);                    // yL yH
+      // Pixel data
+      for(let y=0;y<h;y++){
+        for(let bx=0;bx<bytesPerRow;bx++){
+          let byte=0;
+          for(let bit=0;bit<8;bit++){
+            const x = bx*8+bit;
+            if(x<printerW){
+              const idx=(y*printerW+x)*4;
+              // Pixel hitam = bit 1 (printer thermal: 1=cetak, 0=kosong)
+              if(d[idx]<128) byte |= (0x80 >> bit);
+            }
+          }
+          bytes.push(byte);
+        }
+      }
+      resolve(bytes);
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 async function doPrintCopy(sale, copyNum){
   const W=32;
   let b=[];
@@ -2842,6 +3170,16 @@ async function doPrintCopy(sale, copyNum){
 
   if(copyNum===1){
     // ══ RANGKAP 1 — STRUK PELANGGAN (LENGKAP) ══
+
+    // ── Cetak Foto (jika ada) ──
+    if(strukFotoBwDataUrl){
+      try {
+        const fotoBytes = await fotoToEscPos(strukFotoBwDataUrl);
+        b.push(...fotoBytes);
+        b.push(...FEED(1));
+      } catch(e){ console.warn('Gagal cetak foto:', e); }
+    }
+
     b.push(...ESC_CENTER,...ESC_BIG,...ESC_BOLD_ON);
     b.push(...encBytes(strukCfg.nama_toko||'SANA COFFEE'),...LF);
     b.push(...ESC_NORMAL,...ESC_BOLD_OFF);
@@ -2945,13 +3283,17 @@ let editingProduct=null, productImageData='';
 
 function renderInventory(){
   const q=(document.getElementById('inv-search').value||'').toLowerCase();
-  const cat=document.getElementById('inv-cat-filter').value;
   const sf=document.getElementById('inv-stock-filter').value;
   const products=getProducts();
   const cats=[...new Set(products.map(p=>p.category))].filter(Boolean);
   const catSel=document.getElementById('inv-cat-filter');
-  const curCat=catSel.value;
-  catSel.innerHTML='<option value="">Semua Kategori</option>'+cats.map(c=>`<option value="${c}" ${c===curCat?'selected':''}>${c}</option>`).join('');
+  const cat=catSel.value; // baca SEBELUM overwrite innerHTML
+  catSel.innerHTML='<option value="">Semua Kategori</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+  // MN1 FIX: Restore selected value secara eksplisit setelah rebuild innerHTML.
+  // Mengandalkan atribut 'selected' di template string tidak reliable di semua browser
+  // karena browser bisa reset value ke option pertama setelah innerHTML ditulis ulang.
+  if(cat && cats.includes(cat)) catSel.value = cat;
+  else catSel.value = '';
   document.getElementById('cat-datalist').innerHTML=cats.map(c=>`<option value="${c}">`).join('');
 
   // Hitung ATS untuk semua produk agar status stok akurat
@@ -3049,7 +3391,7 @@ function openProductModal(id=null){
     document.getElementById('prod-desc').value=p.desc||'';
     productImageData=p.image||''; updateImgPreview(p.image||'');
   } else {
-    ['prod-name','prod-category','prod-desc'].forEach(id=>document.getElementById(id).value='');
+    ['prod-name','prod-category','prod-desc'].forEach(fid=>document.getElementById(fid).value=''); // BUG FIX: fid agar tidak shadow param
     document.getElementById('prod-code').value='P'+Date.now().toString().slice(-4);
     document.getElementById('prod-unit').value='pcs';
     document.getElementById('prod-stock').value='0';
@@ -3259,13 +3601,16 @@ async function savePurchase(){
   if(items.length===0){toast('Tambahkan minimal 1 item bahan baku!','error');return;}
   const nota=document.getElementById('pur-nota').value.trim();
   if(!nota){toast('Nomor nota wajib diisi!','error');return;}
+  // M5 FIX: Validasi tanggal wajib diisi agar filter laporan tidak rusak
+  const purDate=document.getElementById('pur-date').value;
+  if(!purDate){toast('Tanggal pembelian wajib diisi!','error');return;}
 
   showLoading('Menyimpan pembelian & update stok bahan baku...');
   try {
     const bbs=getBahanBaku();
     const purchaseData={
       id:genId('B'), nota,
-      date:document.getElementById('pur-date').value,
+      date:purDate,
       datetime:new Date().toISOString(),
       supplier:document.getElementById('pur-supplier').value.trim()||'-',
       operator:currentUser.name, operatorRole:currentUser.role,
@@ -3352,56 +3697,111 @@ async function deletePurchase(id){
 
 // ===================== OPNAME =====================
 let opnameData={};
-function renderOpname(){
-  const products=getProducts(); opnameData={};
-  products.forEach(p=>{opnameData[p.id]=null;});
-  document.getElementById('opname-list').innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 80px 110px 80px;gap:8px;padding:8px 12px;background:var(--surface2);border-radius:8px;margin-bottom:8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3)">
-      <span>Produk</span><span style="text-align:center">Stok Sistem</span><span style="text-align:center">Stok Fisik</span><span style="text-align:center">Selisih</span>
-    </div>`+
-    products.map(p=>`
-    <div class="opname-item">
-      <div class="opname-name"><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:var(--ink3)">${p.category||''} · ${p.unit||'pcs'}</div></div>
-      <div class="opname-system">${p.stock}</div>
-      <input class="input input-sm opname-input" type="number" min="0" placeholder="Fisik" id="opname-${p.id}" oninput="calcDiff('${p.id}',${p.stock},this.value)">
-      <div class="opname-diff diff-zero" id="diff-${p.id}">—</div>
-    </div>`).join('');
+let opnameMode='produk'; // 'produk' | 'bb'
+
+function showOpnameTab(mode, el){
+  opnameMode = mode;
+  document.querySelectorAll('#page-opname .report-tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  // MD1 FIX: Reset opnameData dan clear semua input saat ganti tab agar nilai
+  // dari mode sebelumnya (produk vs BB) tidak bercampur / tertinggal di DOM
+  opnameData = {};
+  renderOpname();
 }
+
+function renderOpname(){
+  opnameData={};
+  const headerRow = `
+    <div style="display:grid;grid-template-columns:1fr 80px 110px 80px;gap:8px;padding:8px 12px;background:var(--surface2);border-radius:8px;margin-bottom:8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3)">
+      <span>${opnameMode==='bb'?'Bahan Baku':'Produk'}</span><span style="text-align:center">Stok Sistem</span><span style="text-align:center">Stok Fisik</span><span style="text-align:center">Selisih</span>
+    </div>`;
+
+  if(opnameMode==='bb'){
+    const bbs=getBahanBaku();
+    bbs.forEach(b=>{opnameData['bb_'+b.id]=null;});
+    document.getElementById('opname-list').innerHTML = headerRow +
+      (bbs.length ? bbs.map(b=>`
+        <div class="opname-item">
+          <div class="opname-name"><div style="font-weight:500">${b.name}</div><div style="font-size:11px;color:var(--ink3)">${b.category||''} · ${b.unit||''}</div></div>
+          <div class="opname-system">${Number(b.stock).toLocaleString('id-ID')}</div>
+          <input class="input input-sm opname-input" type="number" min="0" step="0.01" placeholder="Fisik" id="opname-bb_${b.id}" oninput="calcDiff('bb_${b.id}',${b.stock},this.value)">
+          <div class="opname-diff diff-zero" id="diff-bb_${b.id}">—</div>
+        </div>`).join('')
+      : '<div style="text-align:center;padding:40px;color:var(--ink3)">Belum ada bahan baku</div>');
+  } else {
+    const products=getProducts();
+    products.forEach(p=>{opnameData[p.id]=null;});
+    document.getElementById('opname-list').innerHTML = headerRow +
+      products.map(p=>`
+        <div class="opname-item">
+          <div class="opname-name"><div style="font-weight:500">${p.name}</div><div style="font-size:11px;color:var(--ink3)">${p.category||''} · ${p.unit||'pcs'}</div></div>
+          <div class="opname-system">${p.stock}</div>
+          <input class="input input-sm opname-input" type="number" min="0" step="0.01" placeholder="Fisik" id="opname-${p.id}" oninput="calcDiff('${p.id}',${p.stock},this.value)">
+          <div class="opname-diff diff-zero" id="diff-${p.id}">—</div>
+        </div>`).join('');
+  }
+}
+
 function calcDiff(id,system,val){
-  const physical=parseInt(val);
+  const physical=parseFloat(val); // FIX: parseFloat agar stok desimal (misal 0.5 kg) tidak dipotong
   const diffEl=document.getElementById('diff-'+id);
   opnameData[id]=isNaN(physical)?null:physical;
   if(isNaN(physical)||val===''){diffEl.textContent='—';diffEl.className='opname-diff diff-zero';return;}
-  const diff=physical-system;
-  diffEl.textContent=(diff>=0?'+':'')+diff;
+  const diff=physical-Number(system);
+  diffEl.textContent=(diff>=0?'+':'')+parseFloat(diff.toFixed(3));
   diffEl.className='opname-diff '+(diff>0?'diff-pos':diff<0?'diff-neg':'diff-zero');
 }
-function resetOpname(){renderOpname();}
+function resetOpname(){opnameMode='produk';document.querySelectorAll('#page-opname .report-tab').forEach((t,i)=>t.classList.toggle('active',i===0));renderOpname();}
 
 async function saveOpname(){
-  const products=getProducts();
   const adjustments=[];
-  products.forEach(p=>{
-    const physical=opnameData[p.id];
-    if(physical!==null&&physical!==p.stock){
-      adjustments.push({productId:p.id,productName:p.name,before:p.stock,after:physical,diff:physical-p.stock});
-    }
-  });
+
+  if(opnameMode==='bb'){
+    const bbs=getBahanBaku();
+    bbs.forEach(b=>{
+      const physical=opnameData['bb_'+b.id];
+      if(physical!==null && physical!==Number(b.stock)){
+        adjustments.push({type:'bb', id:b.id, productId:b.id, productName:b.name, before:Number(b.stock), after:physical, diff:physical-Number(b.stock), unit:b.unit});
+      }
+    });
+  } else {
+    const products=getProducts();
+    products.forEach(p=>{
+      const physical=opnameData[p.id];
+      if(physical!==null && physical!==p.stock){
+        adjustments.push({type:'produk', id:p.id, productId:p.id, productName:p.name, before:p.stock, after:physical, diff:physical-p.stock, unit:p.unit||'pcs'});
+      }
+    });
+  }
+
   if(adjustments.length===0){toast('Tidak ada perubahan stok.','info');return;}
 
   showLoading('Menyimpan opname...');
   try {
-    const opname={id:genId('OP'),date:today(),datetime:new Date().toISOString(),by:currentUser.name,adjustments};
+    const opname={id:genId('OP'),date:today(),datetime:new Date().toISOString(),by:currentUser.name, mode:opnameMode, adjustments};
     const result=await api('saveOpname',{opname});
     if(!result.success) throw new Error(result.message);
-    // Update cache
+
+    // Update cache lokal
     cache.opname.push(opname);
     adjustments.forEach(a=>{
-      const p=cache.products.find(x=>x.id===a.productId);
-      if(p) p.stock=a.after;
+      if(a.type==='bb'){
+        const bb=cache.bahanbaku.find(x=>x.id===a.id);
+        if(bb) bb.stock=a.after;
+      } else {
+        const p=cache.products.find(x=>x.id===a.productId);
+        if(p) p.stock=a.after;
+      }
     });
-    toast(`Opname disimpan! ${adjustments.length} produk diperbarui.`,'success');
-    renderOpname(); renderInventory();
+    const tipe = opnameMode==='bb' ? 'bahan baku' : 'produk';
+    toast(`Opname disimpan! ${adjustments.length} ${tipe} diperbarui.`,'success');
+    // M2 FIX: Reset semua input fisik & diff agar nilai lama tidak tertinggal di form
+    opnameData = {};
+    document.querySelectorAll('.opname-input').forEach(el => { el.value = ''; });
+    document.querySelectorAll('.opname-diff').forEach(el => { el.textContent = '—'; el.className = 'opname-diff diff-zero'; });
+    renderOpname();
+    if(opnameMode!=='bb') renderInventory();
+    else refreshPOSIfActive();
   } catch(err){ toast('Gagal: '+err.message,'error'); }
   finally { hideLoading(); }
 }
@@ -3410,13 +3810,22 @@ function showOpnameHistory(){
   const history=cache.opname||[];
   document.getElementById('opname-history-content').innerHTML=history.length?[...history].reverse().map(h=>`
     <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div><strong>${h.id}</strong> · ${fmtDatetime(h.datetime)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+        <div>
+          <strong>${h.id}</strong> · ${fmtDatetime(h.datetime)}
+          <span class="tag ${h.mode==='bb'?'tag-blue':'tag-green'}" style="margin-left:6px;font-size:10px">${h.mode==='bb'?'🧪 Bahan Baku':'📦 Produk'}</span>
+        </div>
         <div style="font-size:12px;color:var(--ink3)">Oleh: ${h.by}</div>
       </div>
       <table style="width:100%;font-size:12px">
-        <thead><tr><th>Produk</th><th>Sebelum</th><th>Sesudah</th><th>Selisih</th></tr></thead>
-        <tbody>${h.adjustments.map(a=>`<tr><td>${a.productName}</td><td class="td-mono">${a.before}</td><td class="td-mono">${a.after}</td><td class="td-mono" style="color:${a.diff>0?'var(--accent3)':a.diff<0?'var(--accent)':'var(--ink3)'}">${a.diff>=0?'+':''}${a.diff}</td></tr>`).join('')}</tbody>
+        <thead><tr><th>${h.mode==='bb'?'Bahan Baku':'Produk'}</th><th>Satuan</th><th>Sebelum</th><th>Sesudah</th><th>Selisih</th></tr></thead>
+        <tbody>${(h.adjustments||[]).map(a=>`<tr>
+          <td>${a.productName||a.name||'-'}</td>
+          <td style="color:var(--ink3)">${a.unit||'-'}</td>
+          <td class="td-mono">${Number(a.before).toLocaleString('id-ID')}</td>
+          <td class="td-mono">${Number(a.after).toLocaleString('id-ID')}</td>
+          <td class="td-mono" style="color:${a.diff>0?'var(--accent3)':a.diff<0?'var(--accent)':'var(--ink3)'}">${a.diff>=0?'+':''}${parseFloat(Number(a.diff).toFixed(3))}</td>
+        </tr>`).join('')}</tbody>
       </table>
     </div>`).join(''):'<div style="text-align:center;padding:40px;color:var(--ink3)">Belum ada riwayat opname</div>';
   openModal('modal-opname-history');
@@ -3451,7 +3860,7 @@ function renderLaporan(){
         <td class="td-mono" style="font-size:11px">${s.id}</td>
         <td>${fmtDatetime(s.datetime)}</td>
         <td>${s.customer||'Umum'}</td>
-        <td style="font-size:11px">${s.items.map(i=>i.productName+'×'+i.qty).join(', ')}</td>
+        <td style="font-size:11px">${(s.items||[]).map(i=>i.productName+'×'+i.qty).join(', ')}</td>
         <td class="td-mono">${fmt(s.subtotal)}</td>
         <td class="td-mono">${s.discount>0?fmt(s.discount):'-'}</td>
         <td class="td-mono" style="font-weight:600">${fmt(s.total)}</td>
@@ -3465,9 +3874,10 @@ function renderLaporan(){
   } else {
     const purchases=getPurchases().filter(p=>(!from||normalizeDate(p.date)>=from)&&(!to||normalizeDate(p.date)<=to));
     const total=purchases.reduce((a,p)=>a+Number(p.total||0),0);
+    const totalItemsBeli = purchases.reduce((a,p)=>(p.items||[]).reduce((b,i)=>b+(Number(i.qty)||0),0)+a,0);
     document.getElementById('lap-summary').innerHTML=`
       <div class="stat-card" data-icon="📦"><div class="stat-label">Total PO</div><div class="stat-value">${purchases.length}</div></div>
-      <div class="stat-card" data-icon="📊"><div class="stat-label">Total Item</div><div class="stat-value">${purchases.reduce((a,p)=>a+p.items.reduce((b,i)=>b+i.qty,0),0)}</div></div>
+      <div class="stat-card" data-icon="📊"><div class="stat-label">Total Item Dibeli</div><div class="stat-value">${fmtNum(totalItemsBeli)}</div></div>
       <div class="stat-card" data-icon="💸"><div class="stat-label">Total Pengeluaran</div><div class="stat-value red">${fmt(total)}</div></div>`;
     document.getElementById('lap-thead').innerHTML='<th>No. Nota</th><th>Tanggal</th><th>Supplier</th><th>Item</th><th>Total</th><th>Penanggung Jawab</th><th>Keterangan</th>';
     document.getElementById('lap-tbody').innerHTML=purchases.length?[...purchases].reverse().map(p=>`
@@ -3475,7 +3885,7 @@ function renderLaporan(){
         <td class="td-mono">${p.nota}</td>
         <td>${fmtDateOnly(p.date)}</td>
         <td>${p.supplier||'-'}</td>
-        <td style="font-size:11px">${p.items.map(i=>i.productName+'×'+i.qty).join(', ')}</td>
+        <td style="font-size:11px">${(p.items||[]).map(i=>(i.productName||i.bbName||'-')+'×'+i.qty).join(', ')}</td>
         <td class="td-mono" style="font-weight:600">${fmt(p.total)}</td>
         <td><div style="display:flex;align-items:center;gap:6px">
           <div style="width:24px;height:24px;border-radius:50%;background:var(--accent2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${(p.operator||'?')[0].toUpperCase()}</div>
@@ -3515,13 +3925,13 @@ function exportLaporan(){
   let csv='';
   if(currentReport==='penjualan'){
     csv='ID,Tanggal,Pelanggan,Produk,Subtotal,Diskon,Total,Pembayaran,Penanggung Jawab\n';
-    getSales().filter(s=>(!from||normalizeDate(s.date)>=from)&&(!to||normalizeDate(s.date)<=to)).forEach(s=>{
-      csv+=`${s.id},"${s.datetime}","${s.customer||'Umum'}","${s.items.map(i=>i.productName+'x'+i.qty).join('; ')}",${s.subtotal},${s.discount},${s.total},${s.payment},"${s.cashier||''}"\n`;
+    getSales().filter(s=>(!from||getSaleLocalDate(s)>=from)&&(!to||getSaleLocalDate(s)<=to)).forEach(s=>{
+      csv+=`${s.id},"${s.datetime}","${s.customer||'Umum'}","${(s.items||[]).map(i=>i.productName+'x'+i.qty).join('; ')}",${s.subtotal},${s.discount},${s.total},${s.payment},"${s.cashier||''}"\n`;
     });
   } else {
     csv='No.Nota,Tanggal,Supplier,Item,Total,Penanggung Jawab,Keterangan\n';
     getPurchases().filter(p=>(!from||normalizeDate(p.date)>=from)&&(!to||normalizeDate(p.date)<=to)).forEach(p=>{
-      csv+=`${p.nota},"${p.date}","${p.supplier||''}","${p.items.map(i=>i.productName+'x'+i.qty).join('; ')}",${p.total},"${p.operator||'-'}","${p.note||''}"\n`;
+      csv+=`${p.nota},"${p.date}","${p.supplier||''}","${(p.items||[]).map(i=>i.productName+'x'+i.qty).join('; ')}",${p.total},"${p.operator||'-'}","${p.note||''}"\n`;
     });
   }
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
@@ -3530,8 +3940,8 @@ function exportLaporan(){
 }
 
 // ===================== BAHAN BAKU =====================
-function getBahanBaku(){ return cache.bahanbaku; }
-function getResep(){ return cache.resep; }
+function getBahanBaku(){ return cache.bahanbaku||[]; }
+function getResep(){ return cache.resep||{}; } // BUG FIX: null-guard
 
 // BUG FIX: loadBahanBakuLocal hanya dipakai sebagai FALLBACK offline
 // Tidak boleh override data yang sudah berhasil dimuat dari Google Sheets
@@ -3704,11 +4114,13 @@ function showBBTab(tab){
 function renderBahanBaku(){
   const bbs = getBahanBaku();
   const q = (document.getElementById('bb-search').value||'').toLowerCase();
-  const cat = document.getElementById('bb-cat-filter').value;
-  const cats=[...new Set(bbs.map(b=>b.category))].filter(Boolean);
   const catSel=document.getElementById('bb-cat-filter');
-  const curCat=catSel.value;
-  catSel.innerHTML='<option value="">Semua Kategori</option>'+cats.map(c=>`<option value="${c}" ${c===curCat?'selected':''}>${c}</option>`).join('');
+  const cat = catSel.value; // baca SEBELUM innerHTML di-overwrite
+  const cats=[...new Set(bbs.map(b=>b.category))].filter(Boolean);
+  catSel.innerHTML='<option value="">Semua Kategori</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+  // MN1 FIX: Restore selected value eksplisit setelah rebuild — sama seperti renderInventory
+  if(cat && cats.includes(cat)) catSel.value = cat;
+  else catSel.value = '';
   document.getElementById('bb-cat-datalist').innerHTML=cats.map(c=>`<option value="${c}">`).join('');
   const filtered=bbs.filter(b=>{
     if(q&&!b.name.toLowerCase().includes(q)&&!(b.category||'').toLowerCase().includes(q)) return false;
@@ -3884,6 +4296,20 @@ function renderAnalisisList(){
 
 // BAHAN BAKU MODAL
 let editingBB=null;
+function updateBBCostPreview(){
+  const stock = parseFloat(document.getElementById('bb-stock')?.value)||0;
+  const price = parseFloat(document.getElementById('bb-price')?.value)||0;
+  const previewEl = document.getElementById('bb-cost-preview');
+  const valEl     = document.getElementById('bb-cost-preview-val');
+  if(!previewEl||!valEl) return;
+  if(stock>0 && price>0){
+    previewEl.style.display='block';
+    valEl.textContent = fmt(stock*price) + ' ('+fmtNum(stock)+' satuan × '+fmt(price)+')';
+  } else {
+    previewEl.style.display='none';
+  }
+}
+
 function openBahanBakuModal(id=null){
   editingBB=id;
   document.getElementById('bb-modal-title').textContent=id?'Edit Bahan Baku':'Tambah Bahan Baku';
@@ -3896,8 +4322,9 @@ function openBahanBakuModal(id=null){
     document.getElementById('bb-stock').value=b.stock||0;
     document.getElementById('bb-min-stock').value=b.minStock||100;
     document.getElementById('bb-price').value=b.price||0;
+    updateBBCostPreview(); // BUG FIX: update preview saat edit
   } else {
-    ['bb-name','bb-category','bb-unit','bb-desc'].forEach(id=>document.getElementById(id).value='');
+    ['bb-name','bb-category','bb-unit','bb-desc'].forEach(fid=>document.getElementById(fid).value=''); // BUG FIX: ganti nama var dari 'id' agar tidak shadow parameter
     document.getElementById('bb-stock').value='0';
     document.getElementById('bb-min-stock').value='100';
     document.getElementById('bb-price').value='0';
@@ -4557,6 +4984,7 @@ function renderBEPChart(d) {
           tension: 0.3,
           pointRadius: 0,
           borderDash: [5, 3],
+          borderDashOffset: 0,
         },
       ],
     },
@@ -4571,7 +4999,9 @@ function renderBEPChart(d) {
             label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.parsed.y),
           },
         },
-        annotation: {},
+        // MD4 FIX: Hapus annotation:{} — plugin ini tidak di-load sehingga
+        // menyebabkan warning "This chart plugin does not exist" di console setiap
+        // kali halaman Neraca dibuka. Garis BEP sudah ditangani via scatter dataset.
       },
       scales: {
         y: {
@@ -4593,33 +5023,26 @@ function renderBEPChart(d) {
   const bepX = d.bepCupsDay;
   const avgX  = Math.round(d.avgCupsPerDay);
   // Add vertical reference lines as extra datasets
-  bepChart.data.datasets.push({
-    label: 'BEP (' + bepX + ' cup/hr)',
-    data: points.map(c => c === bepX || (points.indexOf(c) > 0 && points[points.indexOf(c)-1] < bepX && c > bepX) ? null : null),
-    borderColor: 'rgba(42,107,200,.0)',
-    pointRadius: 0,
-    fill: false,
-  });
+  // BUG FIX: Dataset junk (semua null) dihapus - tidak berguna dan membuang legend space
 
-  // Better: add a vertical annotation line by using a scatter point + custom draw
-  // Use chartjs plugin workaround: add a 3rd dataset that draws a vertical dashed line
-  // We'll draw BEP marker via a 1-point scatter
+  // BUG FIX: Scatter point pakai label string agar posisi tepat pada bar chart categorical axis
   const bepIdx = points.findIndex(c => c >= bepX);
   if (bepIdx >= 0) {
-    // Gunakan index numerik (bukan string label) agar scatter point muncul di posisi yang benar
+    const bepLabel = String(points[bepIdx]); // label string sesuai X axis bar chart
     const bepRevenue = Math.round(points[bepIdx] * hariOps * d.avgSellPrice);
     bepChart.data.datasets.push({
       type: 'scatter',
       label: '⬤ BEP Point',
-      data: [{ x: bepIdx, y: bepRevenue }],
+      data: [{ x: bepLabel, y: bepRevenue }],
       backgroundColor: '#2a6bc8',
       pointRadius: 7,
       pointStyle: 'triangle',
       showLine: false,
     });
+    // MD4 FIX: update() hanya dipanggil jika dataset BEP point benar-benar ditambahkan.
+    // Jika bepIdx < 0 (BEP di luar range grafik), chart tidak perlu di-update lagi.
+    bepChart.update();
   }
-
-  bepChart.update();
 }
 
 // ===================== NERACA =====================
@@ -4755,6 +5178,435 @@ async function uploadNeracaToSheets(){
     toast('Neraca berhasil diupload ✓','success');
   } catch(err){ toast('Gagal upload: '+err.message,'error'); }
   finally { hideLoading(); }
+}
+
+// ===================== PENGATURAN / SETTINGS =====================
+function renderSettings(){
+  // Isi form dari strukCfg yang sudah dimuat
+  document.getElementById('set-nama-toko').value    = strukCfg.nama_toko    || '';
+  document.getElementById('set-tagline').value      = strukCfg.tagline      !== undefined ? strukCfg.tagline : '';
+  document.getElementById('set-alamat').value       = strukCfg.alamat       || '';
+  document.getElementById('set-telp').value         = strukCfg.telp         || '';
+  document.getElementById('set-header-custom').value= strukCfg.header_custom|| '';
+  document.getElementById('set-footer-custom').value= strukCfg.footer_custom|| 'Terima kasih atas kunjungan Anda!';
+  document.getElementById('set-delay-rangkap2').value = strukCfg.delay_rangkap2 !== undefined ? strukCfg.delay_rangkap2 : 8;
+
+  // Info akun
+  const u = currentUser;
+  document.getElementById('settings-user-info').innerHTML = u
+    ? `<span>👤 <strong>${u.name}</strong></span> &nbsp;·&nbsp; <span>Role: <strong>${u.role||'-'}</strong></span> &nbsp;·&nbsp; <span>Username: <strong>${u.username||'-'}</strong></span>`
+    : '<span style="color:var(--ink3)">Tidak ada sesi aktif</span>';
+
+  // Reset foto jika ada
+  // (foto dipertahankan selama session, tidak di-reset saat refresh form)
+  // Preview struk (rangkap 1 & 2)
+  updateSettingsPreview();
+}
+
+// ── Foto untuk Rangkap 1 ──
+let strukFotoBwDataUrl = null; // base64 B&W canvas result
+
+function handleFotoUpload(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      terapkanFotoBW(img);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+// Fungsi terpusat: konversi gambar → B&W → simpan ke strukFotoBwDataUrl & update semua UI
+function terapkanFotoBW(img){
+  const canvas = document.getElementById('foto-canvas-bw');
+  const maxW = 280;
+  const scale = Math.min(1, maxW / img.width);
+  canvas.width  = Math.round(img.width  * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imageData.data;
+  for(let i=0;i<d.length;i+=4){
+    const gray = Math.round(d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114);
+    d[i]=d[i+1]=d[i+2]=gray;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  strukFotoBwDataUrl = canvas.toDataURL('image/png');
+  document.getElementById('foto-placeholder').style.display = 'none';
+  document.getElementById('foto-preview-wrap').style.display = 'block';
+  const hBtn = document.getElementById('btn-hapus-foto-settings');
+  if(hBtn) hBtn.style.display = '';
+  syncReceiptFotoUI();
+  updateSettingsPreview();
+}
+
+function hapusFoto(){
+  strukFotoBwDataUrl = null;
+  document.getElementById('foto-placeholder').style.display = '';
+  document.getElementById('foto-preview-wrap').style.display = 'none';
+  const canvas = document.getElementById('foto-canvas-bw');
+  if(canvas){ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
+  const hBtn = document.getElementById('btn-hapus-foto-settings');
+  if(hBtn) hBtn.style.display = 'none';
+  syncReceiptFotoUI();
+  updateSettingsPreview();
+}
+
+// ── Kamera di halaman Pengaturan ──
+let kameraSettingsStream = null;
+let kameraSettingsFacing = 'environment';
+
+async function bukaKameraSettings(){
+  const panel = document.getElementById('settings-kamera-panel');
+  const video = document.getElementById('settings-kamera-video');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    toast('Kamera tidak didukung di browser ini.','error'); return;
+  }
+  if(kameraSettingsStream){ kameraSettingsStream.getTracks().forEach(t=>t.stop()); kameraSettingsStream=null; }
+  try {
+    kameraSettingsStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: kameraSettingsFacing, width:{ideal:1280}, height:{ideal:960} },
+      audio:false
+    });
+    video.srcObject = kameraSettingsStream;
+    panel.style.display = '';
+    document.getElementById('btn-kamera-settings').style.display = 'none';
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d=>d.kind==='videoinput');
+    document.getElementById('btn-ganti-kamera-settings').style.display = cams.length > 1 ? '' : 'none';
+  } catch(err){
+    toast('Tidak bisa akses kamera: '+err.message,'error');
+  }
+}
+
+async function gantiKameraSettings(){
+  kameraSettingsFacing = kameraSettingsFacing==='environment' ? 'user' : 'environment';
+  await bukaKameraSettings();
+}
+
+function tutupKameraSettings(){
+  if(kameraSettingsStream){ kameraSettingsStream.getTracks().forEach(t=>t.stop()); kameraSettingsStream=null; }
+  document.getElementById('settings-kamera-panel').style.display = 'none';
+  document.getElementById('btn-kamera-settings').style.display = '';
+}
+
+function jepretFotoSettings(){
+  const video = document.getElementById('settings-kamera-video');
+  const canvas = document.getElementById('settings-kamera-canvas');
+  if(!video || !kameraSettingsStream) return;
+  const maxW = 280;
+  const scale = Math.min(1, maxW / video.videoWidth);
+  const w = Math.round(video.videoWidth * scale);
+  const h = Math.round(video.videoHeight * scale);
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if(kameraSettingsFacing==='user'){ ctx.translate(w,0); ctx.scale(-1,1); }
+  ctx.drawImage(video, 0, 0, w, h);
+  if(kameraSettingsFacing==='user'){ ctx.setTransform(1,0,0,1,0,0); }
+  tutupKameraSettings();
+  // Buat Image dari canvas lalu terapkan B&W
+  const img = new Image();
+  img.onload = function(){ terapkanFotoBW(img); toast('Foto berhasil diambil ✓','success'); };
+  img.src = canvas.toDataURL('image/png');
+}
+
+// ── Foto di modal struk ──
+function handleFotoReceipt(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      // Reuse logic konversi B&W
+      const maxW = 280;
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      // Update canvas preview di settings juga
+      const settingsCanvas = document.getElementById('foto-canvas-bw');
+      if(settingsCanvas){
+        settingsCanvas.width = w; settingsCanvas.height = h;
+        const sctx = settingsCanvas.getContext('2d');
+        sctx.drawImage(img, 0, 0, w, h);
+        const sd = sctx.getImageData(0,0,w,h);
+        for(let i=0;i<sd.data.length;i+=4){ const g=Math.round(sd.data[i]*.299+sd.data[i+1]*.587+sd.data[i+2]*.114); sd.data[i]=sd.data[i+1]=sd.data[i+2]=g; }
+        sctx.putImageData(sd,0,0);
+        document.getElementById('foto-placeholder').style.display='none';
+        document.getElementById('foto-preview-wrap').style.display='block';
+      }
+      // Canvas kecil untuk thumbnail di modal
+      const rc = document.getElementById('receipt-foto-canvas');
+      if(rc){
+        rc.width=w; rc.height=h;
+        const rctx=rc.getContext('2d');
+        rctx.drawImage(img,0,0,w,h);
+        const rd=rctx.getImageData(0,0,w,h);
+        for(let i=0;i<rd.data.length;i+=4){ const g=Math.round(rd.data[i]*.299+rd.data[i+1]*.587+rd.data[i+2]*.114); rd.data[i]=rd.data[i+1]=rd.data[i+2]=g; }
+        rctx.putImageData(rd,0,0);
+      }
+      strukFotoBwDataUrl = settingsCanvas ? settingsCanvas.toDataURL('image/png') : rc.toDataURL('image/png');
+      syncReceiptFotoUI();
+      // Refresh receipt preview (re-render receipt-content)
+      refreshReceiptContent();
+      updateSettingsPreview();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+function hapusFotoReceipt(){
+  strukFotoBwDataUrl = null;
+  // Reset settings canvas
+  const sc = document.getElementById('foto-canvas-bw');
+  if(sc){ sc.getContext('2d').clearRect(0,0,sc.width,sc.height); }
+  document.getElementById('foto-placeholder').style.display='';
+  document.getElementById('foto-preview-wrap').style.display='none';
+  // Reset receipt canvas
+  const rc = document.getElementById('receipt-foto-canvas');
+  if(rc){ rc.getContext('2d').clearRect(0,0,rc.width,rc.height); }
+  syncReceiptFotoUI();
+  refreshReceiptContent();
+  updateSettingsPreview();
+}
+
+function syncReceiptFotoUI(){
+  const hasFoto = !!strukFotoBwDataUrl;
+  const thumb = document.getElementById('receipt-foto-thumb');
+  const placeholder = document.getElementById('receipt-foto-placeholder');
+  const info = document.getElementById('receipt-foto-info');
+  const hapusBtn = document.getElementById('receipt-foto-hapus-btn');
+  if(thumb) thumb.style.display = hasFoto ? '' : 'none';
+  if(placeholder) placeholder.style.display = hasFoto ? 'none' : '';
+  if(info) info.style.display = hasFoto ? '' : 'none';
+  if(hapusBtn) hapusBtn.style.display = hasFoto ? '' : 'none';
+}
+
+// ── Kamera Langsung ──
+let kameraStream = null;
+let kameraFacingMode = 'environment'; // mulai dari kamera belakang
+
+async function bukaKamera(){
+  const panel = document.getElementById('kamera-panel');
+  const video = document.getElementById('kamera-video');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    toast('Kamera tidak didukung di browser ini.','error'); return;
+  }
+  // Tutup stream lama kalau ada
+  if(kameraStream){ kameraStream.getTracks().forEach(t=>t.stop()); kameraStream=null; }
+  try {
+    kameraStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: kameraFacingMode, width:{ideal:1280}, height:{ideal:960} },
+      audio:false
+    });
+    video.srcObject = kameraStream;
+    panel.style.display = '';
+    document.getElementById('btn-buka-kamera').style.display = 'none';
+    // Cek apakah ada >1 kamera, tampilkan tombol ganti kalau ada
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d=>d.kind==='videoinput');
+    document.getElementById('btn-ganti-kamera').style.display = cams.length > 1 ? '' : 'none';
+  } catch(err){
+    toast('Tidak bisa akses kamera: '+err.message,'error');
+  }
+}
+
+async function gantikamera(){
+  kameraFacingMode = kameraFacingMode==='environment' ? 'user' : 'environment';
+  await bukaKamera();
+}
+
+function tutupKamera(){
+  if(kameraStream){ kameraStream.getTracks().forEach(t=>t.stop()); kameraStream=null; }
+  document.getElementById('kamera-panel').style.display = 'none';
+  document.getElementById('btn-buka-kamera').style.display = '';
+}
+
+function jepretFoto(){
+  const video = document.getElementById('kamera-video');
+  const canvas = document.getElementById('kamera-canvas');
+  if(!video || !kameraStream) return;
+  const maxW = 280;
+  const scale = Math.min(1, maxW / video.videoWidth);
+  const w = Math.round(video.videoWidth * scale);
+  const h = Math.round(video.videoHeight * scale);
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  // Flip horizontal kalau kamera depan
+  if(kameraFacingMode==='user'){
+    ctx.translate(w,0); ctx.scale(-1,1);
+  }
+  ctx.drawImage(video, 0, 0, w, h);
+  if(kameraFacingMode==='user'){ ctx.setTransform(1,0,0,1,0,0); }
+  // Konversi ke B&W
+  const imgData = ctx.getImageData(0,0,w,h);
+  const d = imgData.data;
+  for(let i=0;i<d.length;i+=4){
+    const g = Math.round(d[i]*.299+d[i+1]*.587+d[i+2]*.114);
+    d[i]=d[i+1]=d[i+2]=g;
+  }
+  ctx.putImageData(imgData,0,0);
+  strukFotoBwDataUrl = canvas.toDataURL('image/png');
+  // Update thumbnail di modal
+  const rc = document.getElementById('receipt-foto-canvas');
+  if(rc){
+    rc.width=w; rc.height=h;
+    rc.getContext('2d').putImageData(imgData,0,0);
+  }
+  // Sync ke settings preview canvas juga
+  const sc = document.getElementById('foto-canvas-bw');
+  if(sc){
+    sc.width=w; sc.height=h;
+    sc.getContext('2d').putImageData(imgData,0,0);
+    document.getElementById('foto-placeholder').style.display='none';
+    document.getElementById('foto-preview-wrap').style.display='block';
+  }
+  tutupKamera();
+  syncReceiptFotoUI();
+  refreshReceiptContent();
+  updateSettingsPreview();
+  toast('Foto berhasil diambil ✓','success');
+}
+
+function refreshReceiptContent(){
+  if(!lastSaleData) return;
+  const headerLines=(strukCfg.header_custom||'').split('\n').filter(Boolean).map(l=>`<div class="receipt-center"><small>${l}</small></div>`).join('');
+  const footerLines=(strukCfg.footer_custom||'Terima kasih atas kunjungan Anda!').split('\n').filter(Boolean).map(l=>`<div class="receipt-center"><small>${l}</small></div>`).join('');
+  const sale = lastSaleData;
+  const fotoHtmlReceipt = strukFotoBwDataUrl
+    ? `<div style="text-align:center;margin:6px 0"><img src="${strukFotoBwDataUrl}" style="max-width:100%;filter:grayscale(1) contrast(1.1);border-radius:4px"></div><div class="receipt-line"></div>`
+    : '';
+  document.getElementById('receipt-content').innerHTML=`
+    <div class="receipt">
+      ${fotoHtmlReceipt}
+      <div class="receipt-center"><strong style="font-size:16px">${strukCfg.nama_toko||'SANA COFFEE'}</strong></div>
+      ${strukCfg.tagline?`<div class="receipt-center"><small>${strukCfg.tagline}</small></div>`:''}
+      ${strukCfg.alamat?`<div class="receipt-center"><small>${strukCfg.alamat}</small></div>`:''}
+      ${strukCfg.telp?`<div class="receipt-center"><small>&#128222; ${strukCfg.telp}</small></div>`:''}
+      <div class="receipt-center"><small>${fmtDatetime(sale.datetime)||new Date().toLocaleString('id-ID')}</small></div>
+      ${headerLines?`<div class="receipt-line"></div>${headerLines}`:''}
+      <div class="receipt-line"></div>
+      <div class="receipt-row"><span>No.</span><span>${sale.id}</span></div>
+      <div class="receipt-row"><span>Kasir</span><span>${sale.cashier}</span></div>
+      <div class="receipt-row"><span>Pelanggan</span><span>${sale.customer}</span></div>
+      <div class="receipt-line"></div>
+      ${(sale.items||[]).map(i=>`<div class="receipt-row"><span>${i.productName}</span><span></span></div><div class="receipt-row"><span>&nbsp;&nbsp;${i.qty} \xd7 ${fmt(i.sellPrice)}</span><span>${fmt(i.subtotal)}</span></div>`).join('')}
+      <div class="receipt-line"></div>
+      <div class="receipt-row"><span>Subtotal</span><span>${fmt(sale.subtotal)}</span></div>
+      ${sale.discount>0?`<div class="receipt-row"><span>Diskon</span><span>- ${fmt(sale.discount)}</span></div>`:''}
+      <div class="receipt-row"><strong>TOTAL</strong><strong>${fmt(sale.total)}</strong></div>
+      ${sale.payment==='tunai'
+        ? `<div class="receipt-row"><span>Dibayar (Tunai)</span><span>${fmt(sale.total + Math.max(0, sale.change||0))}</span></div>`
+        : `<div class="receipt-row"><span>Dibayar (${(sale.payment||'').toUpperCase()})</span><span>${fmt(sale.total)}</span></div>`
+      }
+      ${(sale.change > 0) ? `<div class="receipt-row"><span>Kembalian</span><span>${fmt(sale.change)}</span></div>` : ''}
+      <div class="receipt-line"></div>
+      ${footerLines}
+    </div>`;
+}
+
+function updateSettingsPreview(){
+  const namaToko  = document.getElementById('set-nama-toko')?.value    || 'SANA COFFEE';
+  const tagline   = document.getElementById('set-tagline')?.value      || '';
+  const alamat    = document.getElementById('set-alamat')?.value       || '';
+  const telp      = document.getElementById('set-telp')?.value         || '';
+  const header    = document.getElementById('set-header-custom')?.value || '';
+  const footer    = document.getElementById('set-footer-custom')?.value || 'Terima kasih atas kunjungan Anda!';
+
+  const headerLines = header.split('\n').filter(Boolean).map(l=>`<div style="text-align:center;font-size:11px">${l}</div>`).join('');
+  const footerLines = footer.split('\n').filter(Boolean).map(l=>`<div style="text-align:center;font-size:11px">${l}</div>`).join('');
+
+  // ── Preview Rangkap 1 ──
+  const prev1 = document.getElementById('settings-struk-preview-1');
+  if(prev1){
+    const fotoHtml = strukFotoBwDataUrl
+      ? `<div style="text-align:center;margin:6px 0"><img src="${strukFotoBwDataUrl}" style="max-width:100%;filter:grayscale(1) contrast(1.1);border-radius:4px"></div><div style="border-top:1px dashed #000;margin:6px 0"></div>`
+      : '';
+    prev1.innerHTML = `
+      <div class="receipt" style="font-size:11px;padding:16px">
+        ${fotoHtml}
+        <div class="receipt-center"><strong style="font-size:14px">${namaToko}</strong></div>
+        ${tagline ? `<div class="receipt-center" style="font-size:10px">${tagline}</div>` : ''}
+        ${alamat  ? `<div class="receipt-center" style="font-size:10px">${alamat}</div>`  : ''}
+        ${telp    ? `<div class="receipt-center" style="font-size:10px">☎ ${telp}</div>` : ''}
+        <div class="receipt-center" style="font-size:10px">${new Date().toLocaleString('id-ID')}</div>
+        <div style="text-align:center;font-size:10px;font-weight:700;border-top:1px dashed #000;padding-top:4px;margin-top:4px">[ RANGKAP 1 - PELANGGAN ]</div>
+        ${headerLines ? `<div style="border-top:1px dashed #000;margin:4px 0"></div>${headerLines}` : ''}
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div class="receipt-row"><span>Contoh Produk</span><span></span></div>
+        <div class="receipt-row"><span>&nbsp;&nbsp;1 × Rp 25.000</span><span>Rp 25.000</span></div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div class="receipt-row"><span>Subtotal</span><span>Rp 25.000</span></div>
+        <div class="receipt-row"><strong>TOTAL</strong><strong>Rp 25.000</strong></div>
+        <div class="receipt-row"><span>Bayar (Tunai)</span><span>Rp 25.000</span></div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        ${footerLines}
+      </div>`;
+  }
+
+  // ── Preview Rangkap 2 ──
+  const prev2 = document.getElementById('settings-struk-preview-2');
+  if(prev2){
+    prev2.innerHTML = `
+      <div class="receipt" style="font-size:11px;padding:16px">
+        <div class="receipt-center"><strong style="font-size:13px">${namaToko}</strong></div>
+        <div class="receipt-center" style="font-size:10px">${new Date().toLocaleString('id-ID',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}</div>
+        <div style="text-align:center;font-size:10px;font-weight:700;border-top:1px dashed #000;padding-top:4px;margin-top:4px">[ DAPUR / ARSIP ]</div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div class="receipt-row"><span>No:</span><span>TRX-XXXXXX</span></div>
+        <div class="receipt-row"><span>Kasir:</span><span>Admin</span></div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div class="receipt-row"><span>Contoh Produk</span><span>x1</span></div>
+        <div style="border-top:1px dashed #000;margin:6px 0"></div>
+        <div class="receipt-row"><strong>TOTAL</strong><strong>Rp 25.000</strong></div>
+      </div>`;
+  }
+}
+
+async function saveStrukSettings(){
+  const settings = {
+    nama_toko    : document.getElementById('set-nama-toko').value.trim()     || 'SANA COFFEE',
+    tagline      : document.getElementById('set-tagline').value.trim(),
+    alamat       : document.getElementById('set-alamat').value.trim(),
+    telp         : document.getElementById('set-telp').value.trim(),
+    header_custom: document.getElementById('set-header-custom').value.trim(),
+    footer_custom: document.getElementById('set-footer-custom').value.trim() || 'Terima kasih atas kunjungan Anda!',
+    delay_rangkap2: Math.max(0, Math.min(30, parseInt(document.getElementById('set-delay-rangkap2').value)||8)),
+  };
+  showLoading('Menyimpan pengaturan...');
+  try {
+    const result = await api('saveSettings', {settings});
+    if(!result.success) throw new Error(result.message||'Gagal simpan');
+    // Update live config
+    Object.assign(strukCfg, settings);
+    // Update topbar brand name
+    // MN3 FIX: Handle nama_toko satu kata (tanpa spasi) dengan benar —
+    // sebelumnya menghasilkan " <span>NAMA</span>" dengan spasi di depan,
+    // atau "<span></span>" jika nama kosong.
+    const brandEls = document.querySelectorAll('.topbar-brand, .login-brand');
+    brandEls.forEach(el => {
+      const parts = settings.nama_toko.trim().split(/\s+/).filter(Boolean);
+      if(parts.length === 0){ el.innerHTML = 'SANA <span>COFFEE</span>'; return; }
+      if(parts.length === 1){ el.innerHTML = '<span>' + parts[0] + '</span>'; return; }
+      el.innerHTML = parts.slice(0,-1).join(' ') + ' <span>' + parts[parts.length-1] + '</span>';
+    });
+    updateSettingsPreview();
+    toast('Pengaturan berhasil disimpan ✓','success');
+  } catch(err) {
+    // Simpan ke config lokal saja jika API gagal
+    Object.assign(strukCfg, settings);
+    toast('Disimpan lokal (Firebase gagal: '+err.message+')','warn');
+  } finally {
+    hideLoading();
+  }
 }
 
 // ===================== KALIBRASI KOPI BEANS =====================
@@ -4911,9 +5763,9 @@ function openKalibrasiModal(id=null){
     ['kalib-beans','kalib-grind-setting','kalib-grinder','kalib-coffee-in','kalib-yield',
      'kalib-water','kalib-time','kalib-temp','kalib-tds','kalib-flavor','kalib-notes',
      'kalib-beans-weight','kalib-beans-price-kg','kalib-cups-tried']
-      .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+      .forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=''; }); // BUG FIX: fid agar tidak shadow param
     ['kalib-roast','kalib-metode','kalib-grind-size','kalib-acidity','kalib-body','kalib-sweetness','kalib-aftertaste']
-      .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+      .forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=''; });
     document.getElementById('kalib-date').value=today();
     document.getElementById('kalib-barista').value=currentUser?.name||'';
     document.getElementById('kalib-status').value='draft';
