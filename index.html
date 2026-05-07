@@ -721,13 +721,13 @@ canvas{width:100%!important}
       </div>
       <div class="date-filter" style="margin-bottom:16px">
         <label style="font-size:12px;font-weight:600;color:var(--ink3)">Dari:</label>
-        <input class="input" type="date" id="lap-from" style="width:160px" onchange="renderLaporan()">
+        <input class="input" type="date" id="lap-from" style="width:160px" onchange="onLapFromChange()">
         <label style="font-size:12px;font-weight:600;color:var(--ink3)">Sampai:</label>
         <input class="input" type="date" id="lap-to" style="width:160px" onchange="renderLaporan()">
         <button class="btn btn-secondary btn-sm" onclick="setDateRange('today')">Hari Ini</button>
         <button class="btn btn-secondary btn-sm" onclick="setDateRange('week')">7 Hari</button>
-        <button class="btn btn-secondary btn-sm" onclick="setDateRange('month')">Bulan Ini</button>
-        <button class="btn btn-secondary btn-sm" onclick="setDateRange('all')">Semua</button>
+        <button class="btn btn-secondary btn-sm admin-only" onclick="setDateRange('month')">Bulan Ini</button>
+        <button class="btn btn-secondary btn-sm admin-only" onclick="setDateRange('all')">Semua</button>
       </div>
       <div id="lap-summary" class="grid-3" style="margin-bottom:16px"></div>
       <div class="table-wrap">
@@ -1784,7 +1784,22 @@ async function api(action, payload={}) {
       return {success:true};
     }
     case 'getSales': {
-      let q = db.collection('sales').orderBy('datetime','desc').limit(1000);
+      // Hemat reads: filter by date di Firestore, bukan fetch semua lalu filter di frontend
+      // payload.from = 'YYYY-MM-DD', payload.all = true untuk ambil semua (laporan custom)
+      let q = db.collection('sales').orderBy('datetime','desc');
+      if(!payload.all && payload.from) {
+        // Filter dari tanggal — datetime disimpan sebagai ISO string, gunakan >= operator
+        q = q.where('datetime', '>=', payload.from + 'T00:00:00.000Z');
+      } else if(!payload.all) {
+        // Default: bulan ini saja (safety fallback)
+        const d = new Date();
+        const monthStart = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01T00:00:00.000Z';
+        q = q.where('datetime', '>=', monthStart);
+      }
+      if(payload.to) {
+        q = q.where('datetime', '<=', payload.to + 'T23:59:59.999Z');
+      }
+      q = q.limit(5000);
       const snap = await q.get();
       return {success:true, data: snap.docs.map(d=>d.data())};
     }
@@ -2118,13 +2133,25 @@ async function safeFetch(action, payload={}){
   }
 }
 
-async function loadAllData(silent=false){
+async function loadAllData(silent=false, salesFrom=null, salesTo=null, salesAll=false){
   if(!silent) showLoading('Memuat data dari Firebase...');
   try {
+    // Default: admin = bulan ini, kasir = 7 hari saja
+    const d = new Date();
+    const monthStart = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+    const weekStart = (()=>{ const dd=new Date(); dd.setDate(dd.getDate()-6); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); })();
+    const defaultFrom = isAdminUser() ? monthStart : weekStart;
+    const sfrom = salesFrom || defaultFrom;
+    const salesPayload = salesAll ? {all:true} : {from: sfrom, to: salesTo||null};
+    // Simpan range yang di-cache agar renderLaporan bisa tahu
+    cache._salesFetchedFrom = salesAll ? '2000-01-01' : sfrom;
+    cache._salesFetchedTo   = salesTo || null;
+    cache._salesFetchedAll  = salesAll;
+
     // Products & Sales wajib sukses — fetch dulu
     const [prodRes, saleRes, purRes, opRes] = await Promise.all([
       safeFetch('getProducts'),
-      safeFetch('getSales'),
+      safeFetch('getSales', salesPayload),
       safeFetch('getPurchases'),
       safeFetch('getOpname'),
     ]);
@@ -2147,7 +2174,8 @@ async function loadAllData(silent=false){
 
     if(!silent){
       const total = cache.products.length + cache.sales.length;
-      if(total > 0) toast('Data berhasil dimuat ✓ ('+cache.products.length+' produk, '+cache.sales.length+' transaksi)','success');
+      const rangeInfo = cache._salesFetchedAll ? 'semua data' : 'bulan ini';
+      if(total > 0) toast('Data berhasil dimuat ✓ ('+cache.products.length+' produk, '+cache.sales.length+' transaksi '+rangeInfo+')','success');
       else toast('Terhubung ke Firebase, belum ada data','info');
     }
   } catch(err) {
@@ -2184,7 +2212,11 @@ async function refreshPage(p){
   else if(p==='inventory') renderInventory();
   else if(p==='purchase') renderPurchases();
   else if(p==='opname') renderOpname();
-  else if(p==='laporan'){setDateRange('month');renderLaporan();}
+  else if(p==='laporan'){
+    if(isAdminUser()) setDateRange('month');
+    else setDateRange('week');
+    renderLaporan();
+  }
   else if(p==='neraca'){setNeracaRange('month');renderNeraca();}
   else if(p==='bahanbaku') renderBahanBakuPage();
   else if(p==='expense'){setExpenseRange('month');renderExpense();}
@@ -2218,7 +2250,11 @@ async function showPage(p){
   else if(p==='inventory') renderInventory();
   else if(p==='purchase') renderPurchases();
   else if(p==='opname') renderOpname();
-  else if(p==='laporan'){setDateRange('month');renderLaporan();}
+  else if(p==='laporan'){
+    if(isAdminUser()) setDateRange('month');
+    else setDateRange('week');
+    renderLaporan();
+  }
   else if(p==='neraca'){setNeracaRange('month');renderNeraca();}
   else if(p==='bahanbaku') renderBahanBakuPage();
   else if(p==='expense'){setExpenseRange('month');renderExpense();}
@@ -3835,6 +3871,11 @@ function showOpnameHistory(){
 let currentReport='penjualan';
 function switchReport(t,el){currentReport=t;document.querySelectorAll('.report-tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');renderLaporan();}
 function setDateRange(r){
+  // Non-admin hanya boleh maksimal 7 hari
+  if(!isAdminUser() && (r==='month'||r==='all')){
+    toast('Akses terbatas. Kasir hanya bisa lihat laporan maksimal 7 hari.','error');
+    return;
+  }
   const d=new Date(),to=today();let from=to;
   if(r==='week'){const dd=new Date();dd.setDate(dd.getDate()-6);from=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');}
   else if(r==='month'){from=d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'))+'-01';}
@@ -3843,10 +3884,49 @@ function setDateRange(r){
   document.getElementById('lap-to').value=to;
   renderLaporan();
 }
-function renderLaporan(){
+
+function onLapFromChange(){
+  // Validasi: non-admin tidak boleh pilih tanggal lebih dari 7 hari lalu
+  if(!isAdminUser()){
+    const from=document.getElementById('lap-from').value;
+    const to=document.getElementById('lap-to').value||today();
+    if(from){
+      const diffMs = new Date(to) - new Date(from);
+      const diffDays = diffMs / (1000*60*60*24);
+      if(diffDays > 6){
+        toast('Akses terbatas. Kasir hanya bisa lihat laporan maksimal 7 hari.','error');
+        // Reset ke 7 hari yang diizinkan
+        const dd=new Date();dd.setDate(dd.getDate()-6);
+        document.getElementById('lap-from').value=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+        renderLaporan();
+        return;
+      }
+    }
+  }
+  renderLaporan();
+}
+async function renderLaporan(){
   const from=document.getElementById('lap-from').value;
   const to=document.getElementById('lap-to').value;
   if(currentReport==='penjualan'){
+    // Cek apakah filter tanggal masih dalam range yang sudah di-cache
+    const cachedFrom = cache._salesFetchedFrom || null;
+    const cachedAll  = cache._salesFetchedAll  || false;
+    const needRefetch = !cachedAll && from && cachedFrom && from < cachedFrom;
+    if(needRefetch){
+      // User pilih rentang di luar cache — fetch ulang dari Firestore sesuai filter
+      showLoading('Mengambil data untuk rentang tanggal ini...');
+      try {
+        const res = await safeFetch('getSales', {from, to: to||null});
+        if(res.success){
+          cache.sales = res.data || [];
+          cache._salesFetchedFrom = from;
+          cache._salesFetchedTo   = to || null;
+          cache._salesFetchedAll  = false;
+        }
+      } catch(e){ toast('Gagal fetch data: '+e.message,'error'); }
+      finally { hideLoading(); }
+    }
     const sales=getSales().filter(s=>(!from||getSaleLocalDate(s)>=from)&&(!to||getSaleLocalDate(s)<=to));
     const total=sales.reduce((a,s)=>a+Number(s.total||0),0);
     const hpp=sales.reduce((a,s)=>a+(s.items||[]).reduce((b,i)=>b+(Number(i.buyPrice)||0)*(Number(i.qty)||0),0),0);
