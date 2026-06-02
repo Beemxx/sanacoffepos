@@ -2206,7 +2206,16 @@ async function refreshData(){
 
 async function refreshPage(p){
   showLoading('Memuat ulang data...');
-  try { await loadAllData(true); } finally { hideLoading(); }
+  // BUG FIX: Saat refresh Neraca, muat data penjualan sejak awal tahun agar BEP akurat
+  const isNeraca = (p === 'neraca');
+  try {
+    if(isNeraca){
+      const yearStart=new Date().getFullYear()+'-01-01';
+      await loadAllData(true, yearStart, null, false);
+    } else {
+      await loadAllData(true);
+    }
+  } finally { hideLoading(); }
   if(p==='dashboard') renderDashboard();
   else if(p==='pos') renderPOS();
   else if(p==='inventory') renderInventory();
@@ -2255,7 +2264,22 @@ async function showPage(p){
     else setDateRange('week');
     renderLaporan();
   }
-  else if(p==='neraca'){setNeracaRange('month');renderNeraca();}
+  else if(p==='neraca'){
+    // BUG FIX: Muat data penjualan dari awal tahun agar BEP punya data historis cukup.
+    // Default loadAllData hanya load bulan ini — jika bulan ini kosong BEP jadi hilang.
+    const yearStart=new Date().getFullYear()+'-01-01';
+    const needMoreData = !cache._salesFetchedAll && (!cache._salesFetchedFrom || cache._salesFetchedFrom > yearStart);
+    if(needMoreData){
+      showLoading('Memuat data historis untuk BEP...');
+      safeFetch('getSales',{from:yearStart,to:null}).then(res=>{
+        if(res.success&&res.data){ cache.sales=res.data; cache._salesFetchedFrom=yearStart; }
+        hideLoading();
+        setNeracaRange('month');renderNeraca();
+      }).catch(()=>{ hideLoading(); setNeracaRange('month');renderNeraca(); });
+    } else {
+      setNeracaRange('month');renderNeraca();
+    }
+  }
   else if(p==='bahanbaku') renderBahanBakuPage();
   else if(p==='expense'){setExpenseRange('month');renderExpense();}
   else if(p==='kalibrasi') renderKalibrasi();
@@ -2805,7 +2829,8 @@ async function checkout(){
 async function showReceipt(sale){
   lastSaleData=sale;
   // Selalu ambil pengaturan struk terbaru dari Firestore setiap kali struk dibuka
-  await loadStrukSettings();
+  // BUG FIX: wrap dalam try-catch agar modal tetap terbuka meski Firebase lambat/gagal
+  try { await loadStrukSettings(); } catch(e){ console.warn('loadStrukSettings gagal:', e.message); }
   // Refresh BT status indicator whenever receipt opens
   setTimeout(()=>updateBtStatus(!!btCharacteristic, btDevice?btDevice.name:''),100);
   // Baris header kustom (multi-line support)
@@ -4894,21 +4919,31 @@ function calcBEPData() {
   const bepCupsMonth = marginPerCup > 0 ? Math.ceil((totalOpex + targetLaba) / marginPerCup) : 0;
   const bepCupsDay   = Math.ceil(bepCupsMonth / hariOps);
 
+  // BUG FIX: hasData = true jika ada data penjualan di cache, bahkan jika bukan bulan ini.
+  // Cache bisa hanya berisi data bulan ini — tapi itu tetap cukup untuk hitung BEP.
+  // Flag limitedData = true jika cache hanya berisi sebagian data (non-all fetch)
+  const limitedData = !cache._salesFetchedAll && totalCups > 0;
+
   return {
     avgSellPrice, avgHPP, marginPerCup, marginPct,
     totalOpex, targetLaba, hariOps,
     bepCupsMonth, bepCupsDay,
     avgCupsPerDay, totalCups, activeDays,
     hasData: totalCups > 0,
+    limitedData,
   };
 }
 
 function renderBEP() {
   const d = calcBEPData();
   if (!d.hasData) {
+    // BUG FIX: Jika cache sales hanya berisi bulan ini dan kosong, beri petunjuk user
+    // untuk memuat semua data agar BEP bisa dihitung dari data historis
     document.getElementById('bep-stats').innerHTML =
-      '<div class="alert alert-warn" style="grid-column:1/-1">⚠️ Belum ada data penjualan. Lakukan beberapa transaksi terlebih dahulu agar proyeksi dapat dihitung.</div>';
+      `<div class="alert alert-warn" style="grid-column:1/-1">⚠️ Belum ada data penjualan dalam periode yang dimuat. Klik <strong>↻ Refresh</strong> di atas atau gunakan tombol <strong>"Semua"</strong> di filter Neraca agar proyeksi BEP bisa dihitung.</div>`;
     ['bep-detail','bep-skenario','bep-asumsi'].forEach(id => { document.getElementById(id).innerHTML = ''; });
+    if(bepChart){bepChart.destroy();bepChart=null;}
+    const ctx=document.getElementById('bep-chart');if(ctx){const c=ctx.getContext('2d');c.clearRect(0,0,ctx.width,ctx.height);}
     return;
   }
 
@@ -5205,6 +5240,8 @@ function renderNeraca(){
     </div>`;
 
   // Render BEP projection
+  // BUG FIX: Jika cache sales belum mencakup semua data (hanya bulan ini),
+  // tetap tampilkan BEP dari data yang ada — renderBEP() sudah handle hasData=false
   renderBEP();
 }
 
