@@ -1235,6 +1235,7 @@ canvas{width:100%!important}
       </div>
       <button class="btn btn-secondary" onclick="connectBluetooth()" id="btn-bt-connect" title="Hubungkan ke thermal printer Bluetooth">📡 Hubungkan</button>
       <button class="btn btn-success" onclick="printThermal()" id="btn-bt-print" disabled title="Print ke thermal printer Bluetooth">🖨️ Print Thermal</button>
+      <button class="btn btn-secondary btn-sm" onclick="diagBluetooth()" title="Cek apakah Bluetooth bisa dipakai di perangkat ini" style="font-size:11px;padding:6px 10px">🔍 Cek BT</button>
       <button class="btn btn-primary" onclick="closeModal('modal-receipt');renderPOS()">✓ Selesai</button>
     </div>
   </div>
@@ -2927,7 +2928,26 @@ function updateBtStatus(connected,name=''){
 }
 
 async function connectBluetooth(){
-  if(!navigator.bluetooth){toast('Web Bluetooth tidak didukung. Gunakan Chrome/Edge di Android atau desktop.','error');return;}
+  // === TABLET FIX: Cek HTTPS (Web Bluetooth wajib HTTPS, tidak bisa HTTP biasa) ===
+  if(location.protocol!=='https:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){
+    toast('❌ Web Bluetooth butuh HTTPS! Buka via https:// bukan http://','error');
+    return;
+  }
+  // === TABLET FIX: Cek dukungan Web Bluetooth dengan pesan lebih jelas ===
+  if(!navigator.bluetooth){
+    const ua=navigator.userAgent||'';
+    const isAndroid=/android/i.test(ua);
+    const isChrome=/chrome/i.test(ua)&&!/edg/i.test(ua);
+    const isSamsung=/samsungbrowser/i.test(ua);
+    if(isSamsung){
+      toast('Samsung Browser tidak support Bluetooth. Gunakan Chrome di tablet.','error');
+    } else if(isAndroid&&!isChrome){
+      toast('Buka di Chrome (bukan browser bawaan) untuk pakai Bluetooth di Android.','error');
+    } else {
+      toast('Web Bluetooth tidak didukung. Gunakan Chrome versi terbaru di Android.','error');
+    }
+    return;
+  }
 
   const btnC=document.getElementById('btn-bt-connect');
   const origText=btnC?btnC.textContent:'';
@@ -2963,31 +2983,38 @@ async function connectBluetooth(){
 
     if(btnC) btnC.textContent='🔧 Inisialisasi...';
 
-    // Cari service — prioritaskan UUID Rongta RPP02N dulu
+    // Android fix: getPrimaryServices() sekaligus jauh lebih cepat daripada
+    // getPrimaryService(uuid) satu per satu — tiap miss bisa timeout 2-3 detik di Android 12
     let svc=null;
-    for(const id of PRINTER_SERVICES){
-      try{svc=await server.getPrimaryService(id);break;}catch(e){}
-    }
-    // Fallback: ambil service pertama yang tersedia
-    if(!svc){
-      try{const ss=await server.getPrimaryServices();if(ss.length)svc=ss[0];}catch(e){}
+    try{
+      const allSvcs=await server.getPrimaryServices();
+      // Prioritaskan UUID yang dikenal, fallback ke service pertama yang ada
+      const knownSet=new Set(PRINTER_SERVICES.map(s=>s.toLowerCase()));
+      svc=allSvcs.find(s=>knownSet.has(s.uuid.toLowerCase()))||allSvcs[0]||null;
+    }catch(e){
+      // Beberapa Android lama tidak support getPrimaryServices() tanpa UUID — fallback manual
+      for(const id of PRINTER_SERVICES){
+        try{svc=await server.getPrimaryService(id);break;}catch(_){}
+      }
     }
     if(!svc)throw new Error('Service printer tidak ditemukan.');
 
-    // Cari characteristic write — prioritaskan UUID Rongta RPP02N dulu
+    // Ambil semua characteristic sekaligus, pilih yang bisa write
     let ch=null;
-    for(const id of PRINTER_CHARS){
-      try{
-        const c=await svc.getCharacteristic(id);
-        if(c.properties.write||c.properties.writeWithoutResponse){ch=c;break;}
-      }catch(e){}
-    }
-    // Fallback: scan semua characteristic, pilih yang bisa write
-    if(!ch){
-      try{
-        const cs=await svc.getCharacteristics();
-        ch=cs.find(c=>c.properties.writeWithoutResponse)||cs.find(c=>c.properties.write)||null;
-      }catch(e){}
+    try{
+      const allChars=await svc.getCharacteristics();
+      // writeWithoutResponse lebih stabil di Android (tidak perlu tunggu ACK)
+      ch=allChars.find(c=>c.properties.writeWithoutResponse)
+        ||allChars.find(c=>c.properties.write)
+        ||null;
+    }catch(e){
+      // Fallback: coba per UUID
+      for(const id of PRINTER_CHARS){
+        try{
+          const c=await svc.getCharacteristic(id);
+          if(c.properties.write||c.properties.writeWithoutResponse){ch=c;break;}
+        }catch(_){}
+      }
     }
     if(!ch)throw new Error('Characteristic write tidak ditemukan.');
 
@@ -3001,6 +3028,39 @@ async function connectBluetooth(){
   }finally{
     if(btnC){btnC.disabled=false;btnC.textContent=btCharacteristic?'🔗 Ganti':origText;}
   }
+}
+
+// TABLET FIX: Fungsi diagnostik Bluetooth — bantu user tahu masalahnya
+function diagBluetooth(){
+  const ua = navigator.userAgent||'';
+  const isAndroid = /android/i.test(ua);
+  const isTablet = isAndroid && !/mobile/i.test(ua);
+  const isMobile = isAndroid && /mobile/i.test(ua);
+  const isChrome = /chrome/i.test(ua) && !/edg|opr|samsung/i.test(ua);
+  const isSamsung = /samsungbrowser/i.test(ua);
+  const isFirefox = /firefox/i.test(ua);
+  const btSupport = !!navigator.bluetooth;
+  const isHttps = location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1';
+  const chromeVer = (ua.match(/Chrome\/(\d+)/)||[])[1];
+
+  let lines = ['=== Diagnosa Bluetooth ==='];
+  lines.push('Perangkat: ' + (isTablet?'🖥️ Tablet Android':(isMobile?'📱 HP Android':'💻 Desktop/Other')));
+  lines.push('Browser: ' + (isSamsung?'⚠️ Samsung Browser (TIDAK support)':(isFirefox?'⚠️ Firefox (TIDAK support)':(isChrome?'✅ Chrome v'+chromeVer:'⚠️ Browser tidak dikenal'))));
+  lines.push('HTTPS: ' + (isHttps?'✅ Ya (aman)':'❌ TIDAK — wajib https://'));
+  lines.push('Web Bluetooth API: ' + (btSupport?'✅ Tersedia':'❌ TIDAK tersedia'));
+  lines.push('');
+
+  let tips = [];
+  if(!isHttps) tips.push('• Buka URL dengan https:// bukan http://');
+  if(isSamsung) tips.push('• Ganti ke Chrome (bukan Samsung Browser)');
+  if(isFirefox) tips.push('• Firefox tidak support Web Bluetooth, pakai Chrome');
+  if(isAndroid && isChrome && !btSupport) tips.push('• Di Chrome Android, ketik chrome://flags dan aktifkan "Web Bluetooth" → "Enabled"');
+  if(isAndroid && !isChrome) tips.push('• Install / buka Google Chrome versi terbaru');
+  if(btSupport && isHttps) tips.push('• Semua OK! Coba tombol 📡 Hubungkan');
+
+  if(tips.length) { lines.push('💡 Solusi:'); lines.push(...tips); }
+
+  alert(lines.join('\n'));
 }
 
 function onBtDisconnected(){
@@ -3090,12 +3150,13 @@ function fmtThermalShort(n){
 
 function dash(W=32){return '-'.repeat(W);}
 
-// BUG FIX: sendToPrinter — chunk lebih kecil & delay lebih besar untuk Android
-// Android BLE buffer biasanya 20-512 bytes, delay minimal 80-120ms antar chunk
+// TABLET FIX: sendToPrinter — adaptive chunk size & delay untuk tablet Android
+// Tablet Android BLE buffer sering lebih kecil & lebih lambat dari laptop
+// Gunakan chunk 20 bytes (minimum BLE) dengan delay 150ms untuk kompatibilitas maksimal
 async function sendToPrinter(bytes){
   if(!btCharacteristic)throw new Error('Printer tidak terhubung!');
   
-  // BUG FIX: Cek apakah GATT masih connected sebelum kirim
+  // Cek apakah GATT masih connected sebelum kirim
   if(btDevice && btDevice.gatt && !btDevice.gatt.connected){
     try{
       await btDevice.gatt.connect();
@@ -3111,17 +3172,28 @@ async function sendToPrinter(bytes){
   }
 
   const data=new Uint8Array(bytes);
-  // BUG FIX: Gunakan chunk 200 bytes (aman untuk hampir semua printer Android)
-  const CHUNK_SIZE=200;
+  
+  // TABLET FIX: Deteksi apakah ini tablet/mobile Android
+  // Tablet Android punya BLE stack lebih lambat → chunk lebih kecil, delay lebih besar
+  const ua=navigator.userAgent||'';
+  const isTablet=/android/i.test(ua)&&!/mobile/i.test(ua); // Android tablet = ada "android" tapi tidak ada "mobile"
+  const isMobileAndroid=/android/i.test(ua)&&/mobile/i.test(ua);
+  const isAndroid=isTablet||isMobileAndroid;
+  
+  // Chunk size: tablet=20 bytes (safe BLE minimum), android phone=64, desktop=128
+  const CHUNK_SIZE = isTablet ? 20 : (isMobileAndroid ? 64 : 128);
+  // Delay: tablet=180ms (lebih lambat), android phone=150ms, desktop=80ms
+  const CHUNK_DELAY = isTablet ? 180 : (isMobileAndroid ? 150 : 80);
+
   for(let i=0;i<data.length;i+=CHUNK_SIZE){
     const chunk=data.slice(i,i+CHUNK_SIZE);
-    // BUG FIX: Coba writeValueWithoutResponse dulu, fallback ke writeValue
+    // Coba writeValueWithoutResponse dulu (lebih stabil di Android), fallback ke writeValue
     let success=false;
     if(btCharacteristic.properties.writeWithoutResponse){
       try{
         await btCharacteristic.writeValueWithoutResponse(chunk);
         success=true;
-      }catch(e){/* fallback */}
+      }catch(e){/* fallback ke writeValue */}
     }
     if(!success){
       try{
@@ -3130,9 +3202,10 @@ async function sendToPrinter(bytes){
         throw new Error('Gagal kirim data ke printer: '+e.message);
       }
     }
-    // BUG FIX: Delay 80ms antar chunk — cukup untuk printer thermal Android (50ms sering overflow)
-    await new Promise(r=>setTimeout(r,80));
+    await new Promise(r=>setTimeout(r,CHUNK_DELAY));
   }
+  // TABLET FIX: Tambah delay akhir agar printer selesai flush buffer sebelum cut
+  if(isAndroid) await new Promise(r=>setTimeout(r,300));
 }
 
 // BUG FIX: printThermal — hapus countdown 10 detik yang tidak perlu
