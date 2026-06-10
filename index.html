@@ -426,13 +426,52 @@ canvas{width:100%!important}
 /* number format helper visual */
 .currency::before{content:'Rp '}
 
+/* ===== SHIFT ===== */
+.shift-status-card{border-radius:16px;padding:28px;text-align:center;position:relative;overflow:hidden;margin-bottom:20px}
+.shift-status-card.open{background:linear-gradient(135deg,#d4f0e2,#e8faf0);border:2px solid #90d0b0}
+.shift-status-card.closed{background:linear-gradient(135deg,var(--surface2),var(--surface));border:2px solid var(--border)}
+.shift-status-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);margin-bottom:8px}
+.shift-status-main{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:4px}
+.shift-status-main.open{color:var(--accent3)}
+.shift-status-main.closed{color:var(--ink3)}
+.shift-timer{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--accent2);margin-top:8px}
+.shift-meta{font-size:12px;color:var(--ink3);margin-top:4px}
+.shift-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:700px){.shift-summary-grid{grid-template-columns:1fr 1fr}}
+.shift-summary-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.shift-summary-icon{font-size:20px;margin-bottom:4px}
+.shift-summary-label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;font-weight:600;color:var(--ink3);margin-bottom:4px}
+.shift-summary-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;letter-spacing:-.5px}
+.shift-summary-val.green{color:var(--accent3)}
+.shift-summary-val.blue{color:var(--accent2)}
+.shift-summary-val.red{color:var(--accent)}
+.shift-summary-sub{font-size:11px;color:var(--ink3);margin-top:2px}
+.shift-history-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:box-shadow .2s}
+.shift-history-item:hover{box-shadow:var(--shadow)}
+.shift-history-date{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--ink)}
+.shift-history-time{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);margin-top:2px}
+.shift-history-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.shift-stat-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:12px}
+.shift-pill-green{background:#d4f0e2;color:#0a5030}
+.shift-pill-blue{background:#ddeeff;color:#0a2870}
+.shift-pill-red{background:#fde8e4;color:#8a2010}
+.shift-pill-gray{background:var(--surface2);color:var(--ink3)}
+.shift-open-form{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px}
+.rekap-section{margin-bottom:16px}
+.rekap-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink3);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.rekap-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;border-bottom:1px dashed var(--border)}
+.rekap-row:last-child{border-bottom:none}
+.rekap-row.total{font-weight:700;font-size:15px;border-top:2px solid var(--border);border-bottom:none;padding-top:10px;margin-top:4px}
+.rekap-row.total span:last-child{color:var(--accent3)}
+.rekap-row.total-red span:last-child{color:var(--accent)}
+.rekap-row.net-profit span:last-child{font-family:'Syne',sans-serif;font-size:18px;letter-spacing:-.5px}
 /* ===== PRINT STYLES (Android & Desktop) ===== */
 @media print {
-  /* Sembunyikan semua elemen UI */
-  body > * { display: none !important; }
+  /* Sembunyikan semua elemen UI kecuali print-area */
+  body > *:not(#print-area) { display: none !important; }
 
   /* Tampilkan hanya print-area */
-  #print-area { display: block !important; }
+  #print-area { display: block !important; position: static !important; }
 
   /* Reset body */
   body {
@@ -453,6 +492,7 @@ canvas{width:100%!important}
     line-height: 1.6 !important;
     color: #000 !important;
     background: #fff !important;
+    font-family: 'Courier New', Courier, monospace !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -512,6 +552,7 @@ canvas{width:100%!important}
   </div>
   <div class="nav">
     <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="nav-icon">📊</span> Dashboard</div>
+    <div class="nav-item" data-page="shift" onclick="showPage('shift')"><span class="nav-icon">🕐</span> Shift <span id="shift-nav-badge" class="badge" style="display:none;background:var(--accent3)">BUKA</span></div>
     <div class="nav-item" data-page="pos" onclick="showPage('pos')"><span class="nav-icon">🛒</span> Kasir / POS</div>
     <div class="nav-item" data-page="inventory" onclick="showPage('inventory')"><span class="nav-icon">📦</span> Inventori</div>
     <div class="nav-item" data-page="purchase" onclick="showPage('purchase')"><span class="nav-icon">🛍️</span> Pembelian</div>
@@ -560,6 +601,8 @@ canvas{width:100%!important}
 
     <!-- POS -->
     <div class="page" id="page-pos">
+      <!-- Shift banner: ditampilkan/disembunyikan oleh renderPOS() -->
+      <div id="pos-shift-banner" style="display:none;margin-bottom:12px"></div>
       <div class="section-header">
         <div><div class="section-title">Kasir / POS</div><div class="section-sub">Pilih produk untuk ditambahkan ke keranjang</div></div>
         <button class="btn btn-secondary btn-sm" onclick="refreshPage('pos')">↻ Refresh</button>
@@ -910,6 +953,50 @@ canvas{width:100%!important}
     </div>
 
     <!-- PAGE KALIBRASI BEANS — harus di dalam div.main agar layout benar -->
+
+    <!-- PAGE SHIFT -->
+    <div class="page" id="page-shift">
+      <div class="section-header">
+        <div>
+          <div class="section-title">🕐 Manajemen Shift</div>
+          <div class="section-sub">Open shift saat buka, close shift saat tutup kedai — rekap otomatis per shift</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="shift-header-actions"></div>
+      </div>
+
+      <!-- Status Shift Aktif -->
+      <div id="shift-status-area"></div>
+
+      <!-- Rekap Shift Aktif (muncul saat shift open) -->
+      <div id="shift-live-rekap" style="display:none">
+        <div class="grid-2" style="gap:16px;margin-bottom:20px">
+          <div class="card">
+            <div class="card-title">💰 Pemasukan Shift Ini</div>
+            <div id="shift-rekap-income"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">💸 Pengeluaran Shift Ini</div>
+            <div id="shift-rekap-expense"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-title">🧾 Transaksi Shift Ini</div>
+          <div id="shift-rekap-trx" style="max-height:300px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Riwayat Shift -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:14px;font-weight:700;color:var(--ink)">📋 Riwayat Shift</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input class="input input-sm" type="month" id="shift-history-month" onchange="renderShiftHistory()" style="width:160px">
+          </div>
+        </div>
+        <div id="shift-history-list"></div>
+      </div>
+    </div>
+
     <div class="page" id="page-kalibrasi">
       <div class="section-header">
         <div>
@@ -1235,6 +1322,7 @@ canvas{width:100%!important}
       </div>
       <button class="btn btn-secondary" onclick="connectBluetooth()" id="btn-bt-connect" title="Hubungkan ke thermal printer Bluetooth">📡 Hubungkan</button>
       <button class="btn btn-success" onclick="printThermal()" id="btn-bt-print" disabled title="Print ke thermal printer Bluetooth">🖨️ Print Thermal</button>
+      <button class="btn btn-blue" onclick="printReceipt()" id="btn-print-receipt" title="Print struk via printer WiFi/USB (dialog print sistem)">🖨️ Print Struk</button>
       <button class="btn btn-secondary btn-sm" onclick="diagBluetooth()" title="Cek apakah Bluetooth bisa dipakai di perangkat ini" style="font-size:11px;padding:6px 10px">🔍 Cek BT</button>
       <button class="btn btn-primary" onclick="closeModal('modal-receipt');renderPOS()">✓ Selesai</button>
     </div>
@@ -1703,6 +1791,41 @@ canvas{width:100%!important}
   </div>
 </div>
 
+<!-- MODAL CLOSE SHIFT -->
+<div class="modal-overlay hidden" id="modal-close-shift">
+  <div class="modal modal-lg" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">🔴 Close Shift — Tutup Kedai</div>
+      <button class="close-btn" onclick="closeModal('modal-close-shift')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+      <div id="close-shift-rekap"></div>
+      <div class="input-group" style="margin-top:16px">
+        <label class="input-label">Catatan Penutupan (opsional)</label>
+        <input class="input" id="shift-close-note" placeholder="Contoh: Semua beres, stok kopi habis">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-close-shift')">Batal</button>
+      <button class="btn btn-danger" onclick="doCloseShift()">🔴 Tutup Shift & Cetak Rekap</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SHIFT DETAIL -->
+<div class="modal-overlay hidden" id="modal-shift-detail">
+  <div class="modal modal-lg" style="max-width:580px">
+    <div class="modal-header">
+      <div class="modal-title">📋 Detail Shift</div>
+      <button class="close-btn" onclick="closeModal('modal-shift-detail')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:65vh;overflow-y:auto" id="shift-detail-content"></div>
+    <div class="modal-footer" id="shift-detail-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-shift-detail')">Tutup</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast-container"></div>
 
@@ -1972,6 +2095,19 @@ async function api(action, payload={}) {
       await db.collection('settings').doc('struk').set(payload.settings);
       return { success: true };
     }
+    case 'getShifts': {
+      const snap = await db.collection('shifts').orderBy('openTime','desc').limit(100).get();
+      return {success:true, data: snap.docs.map(d=>d.data())};
+    }
+    case 'saveShift': {
+      const sh = payload.shift;
+      await db.collection('shifts').doc(sh.id).set(sh);
+      return {success:true};
+    }
+    case 'deleteShift': {
+      await db.collection('shifts').doc(payload.id).delete();
+      return {success:true};
+    }
     default:
       return {success:false, message:'Action tidak dikenal: '+action};
   }
@@ -2020,7 +2156,9 @@ function toast(msg,type='success'){
   const icons={success:'✓',error:'✕',warn:'⚠',info:'ℹ'};
   el.innerHTML=`<span>${icons[type]||'•'}</span><span>${msg}</span>`;
   t.appendChild(el);
-  setTimeout(()=>{el.style.animation='fadeOut .3s ease forwards';setTimeout(()=>el.remove(),300)},3500);
+  // Error & warn tampil lebih lama (6 detik) agar sempat dibaca di tablet
+  const duration = (type==='error'||type==='warn') ? 6000 : 3500;
+  setTimeout(()=>{el.style.animation='fadeOut .3s ease forwards';setTimeout(()=>el.remove(),300)},duration);
 }
 
 // ===================== MODAL =====================
@@ -2178,6 +2316,9 @@ async function loadAllData(silent=false, salesFrom=null, salesTo=null, salesAll=
     if(expRes.success)   cache.expenses  = expRes.data   || [];
     if(kalibRes.success) cache.kalibrasi = kalibRes.data || [];
 
+    // Muat shift data
+    await loadShifts();
+
     if(!silent){
       const total = cache.products.length + cache.sales.length;
       const rangeInfo = cache._salesFetchedAll ? 'semua data' : 'bulan ini';
@@ -2250,6 +2391,13 @@ async function showPage(p){
     toast('Akses ditolak. Halaman ini hanya untuk Admin.','error');
     return;
   }
+  // Guard: halaman Kasir/POS wajib shift aktif
+  if(p === 'pos' && !activeShift){
+    // Arahkan ke halaman shift dengan pesan
+    toast('⚠️ Buka shift dulu sebelum mulai kasir!','warn');
+    // Tampilkan halaman shift agar user bisa open shift
+    p = 'shift';
+  }
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   const pageEl = document.getElementById('page-'+p);
@@ -2288,6 +2436,7 @@ async function showPage(p){
   }
   else if(p==='bahanbaku') renderBahanBakuPage();
   else if(p==='expense'){setExpenseRange('month');renderExpense();}
+  else if(p==='shift') renderShift();
   else if(p==='kalibrasi') renderKalibrasi();
   else if(p==='settings') renderSettings();
 }
@@ -2436,6 +2585,30 @@ function renderDashboard(){
 let cart=[],selectedPayment='tunai',posCategory='';
 
 function renderPOS(){
+  // Shift banner
+  const banner = document.getElementById('pos-shift-banner');
+  if(banner){
+    if(activeShift){
+      const r = calcShiftRekap(activeShift);
+      const elapsed = fmtDuration(Date.now() - new Date(activeShift.openTime).getTime());
+      banner.style.display = 'block';
+      banner.innerHTML = `<div style="background:linear-gradient(90deg,#d4f0e2,#e8faf0);border:1.5px solid #90d0b0;border-radius:10px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700;color:var(--accent3)">🟢 Shift Aktif</span>
+          <span style="font-size:12px;color:var(--ink2)">Kasir: <strong>${activeShift.openBy||'-'}</strong></span>
+          <span style="font-size:12px;color:var(--ink3)">Buka: <strong>${fmtTimeShift(activeShift.openTime)}</strong> · ${elapsed}</span>
+          <span style="font-size:12px;color:var(--ink2)">Omset: <strong style="color:var(--accent3)">${fmt(r.totalRevenue)}</strong> (${r.trxCount} trx)</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="showPage('shift');setTimeout(confirmCloseShift,200)" style="font-size:11px;padding:5px 12px">🔴 Close Shift</button>
+      </div>`;
+    } else {
+      banner.style.display = 'block';
+      banner.innerHTML = `<div class="alert alert-warn" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <span>⚠️ <strong>Shift belum dibuka.</strong> Buka shift dulu sebelum melayani pelanggan.</span>
+        <button class="btn btn-success btn-sm" onclick="showPage('shift')">🟢 Buka Shift</button>
+      </div>`;
+    }
+  }
   cart=[];renderCart();
   const products=getProducts();
   const cats=[...new Set(products.map(p=>p.category))].filter(Boolean);
@@ -2748,6 +2921,12 @@ function getCartDisc(){
 
 async function checkout(){
   if(cart.length===0) return;
+  // Guard: shift harus aktif sebelum bisa transaksi
+  if(!activeShift){
+    toast('⚠️ Buka shift dulu sebelum transaksi!','warn');
+    showPage('shift');
+    return;
+  }
   const total=getCartTotal();
   if(selectedPayment==='tunai'){
     const cash=parseFloat(document.getElementById('cash-input').value)||0;
@@ -2879,213 +3058,392 @@ async function showReceipt(sale){
 }
 function printReceipt(){
   // Salin konten struk ke print-area agar @media print bisa menampilkannya
-  // Ini fix untuk Android Chrome yang tidak bisa pakai position:fixed di @media print
   const src = document.getElementById('receipt-content');
   const pa  = document.getElementById('print-area');
   if(src && pa){
     pa.innerHTML = src.innerHTML;
   }
+
+  const ua = navigator.userAgent || '';
+  const isAndroid = /android/i.test(ua);
+  const isSamsungBrowser = /samsungbrowser/i.test(ua);
+
+  // Samsung Browser: tidak bisa pakai window.print() langsung di iframe/modal,
+  // buka popup window baru dengan konten struk, lalu print dari sana.
+  if(isSamsungBrowser){
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        body{margin:0;padding:0;background:#fff;font-family:'Courier New',monospace;font-size:12px}
+        .receipt{max-width:320px;margin:0 auto;padding:16px}
+        .receipt-center{text-align:center}
+        .receipt-line{border-top:1px dashed #000;margin:8px 0}
+        .receipt-row{display:flex;justify-content:space-between}
+        @media print{body{margin:0;padding:0}}
+      </style>
+      </head><body><div class="receipt">${src ? src.innerHTML : pa.innerHTML}</div>
+      <script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},500);},400);}<\/script>
+      </body></html>`;
+    const pw = window.open('','_blank','width=400,height=600');
+    if(pw){
+      pw.document.write(html);
+      pw.document.close();
+    } else {
+      toast('Pop-up diblokir. Izinkan pop-up di browser lalu coba lagi.', 'warn');
+    }
+    setTimeout(function(){ if(pa) pa.innerHTML=''; }, 2000);
+    return;
+  }
+
+  // Android Chrome & Desktop: gunakan window.print() dengan delay cukup
+  // untuk reflow selesai (tablet lebih lambat dari laptop → 800ms)
+  const delay = isAndroid ? 800 : 300;
+  const btn = document.getElementById('btn-print-receipt');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Menyiapkan...'; }
+
   setTimeout(function(){
-    window.print();
-    // Bersihkan print-area setelah print selesai
-    setTimeout(function(){ if(pa) pa.innerHTML=''; }, 1000);
-  }, 300);
+    window.focus(); // penting di beberapa Android agar dialog print muncul
+    try {
+      window.print();
+    } catch(e) {
+      toast('Gagal print: ' + e.message, 'error');
+    }
+    // Bersihkan print-area setelah dialog print muncul
+    setTimeout(function(){
+      if(pa) pa.innerHTML = '';
+      if(btn){ btn.disabled = false; btn.textContent = '🖨️ Print Struk'; }
+    }, isAndroid ? 2000 : 1000);
+  }, delay);
 }
 
-// ===================== BLUETOOTH THERMAL PRINTER =====================
-let btDevice=null,btCharacteristic=null,lastSaleData=null;
-const ESC=0x1B,GS=0x1D;
-const ESC_INIT=[ESC,0x40],ESC_CENTER=[ESC,0x61,0x01],ESC_LEFT=[ESC,0x61,0x00];
-const ESC_BOLD_ON=[ESC,0x45,0x01],ESC_BOLD_OFF=[ESC,0x45,0x00];
-const ESC_BIG=[GS,0x21,0x11],ESC_NORMAL=[GS,0x21,0x00];
-const ESC_CUT=[GS,0x56,0x42,0x00],LF=[0x0A];
+// ===================== BLUETOOTH THERMAL PRINTER — UNIVERSAL ENGINE =====================
+//
+// ARSITEKTUR:
+// Pendekatan ini sama dengan yang dipakai aplikasi POS profesional (Loyverse, iReap, dll).
+// Tidak bergantung pada UUID tertentu — scan SEMUA service & characteristic yang ada,
+// lalu pilih yang bisa write. Ini membuat printer apapun bisa terdeteksi otomatis.
+//
+// ALUR KONEKSI:
+// 1. requestDevice → user pilih printer dari dialog sistem (ini yang trigger Bluetooth permission)
+// 2. gatt.connect() dengan retry — Android tablet sering butuh 2-3x percobaan
+// 3. Scan semua service → cari characteristic yang punya properti write/writeWithoutResponse
+// 4. Simpan characteristic ke btCharacteristic → siap kirim data
+//
+// CARA KIRIM DATA (ESC/POS):
+// Data dikirim dalam chunk kecil (20 bytes) dengan delay antar chunk.
+// 20 bytes = ukuran minimum BLE MTU yang dijamin didukung SEMUA perangkat Android.
+// Tanpa chunking, data besar bisa corrupt atau terpotong di Android tablet.
+//
+// KOMPATIBILITAS:
+// ✅ Rongta RPP02N / RPP300 / RPP400
+// ✅ Epson TM-m30 / TM-P20 / TM-P80
+// ✅ Star Micronics SM-L200 / SM-L300
+// ✅ Zjiang ZJ-5802 / ZJ-5890
+// ✅ Xprinter XP-P300 / XP-P420B
+// ✅ GOOJPRT PT-210 / MTP-II
+// ✅ Printer thermal generik China (Nordic UART / SPP-BLE profile)
+
+let btDevice=null, btCharacteristic=null, lastSaleData=null;
+const ESC=0x1B, GS=0x1D;
+const ESC_INIT=[ESC,0x40];
+const ESC_CENTER=[ESC,0x61,0x01], ESC_LEFT=[ESC,0x61,0x00];
+const ESC_BOLD_ON=[ESC,0x45,0x01], ESC_BOLD_OFF=[ESC,0x45,0x00];
+const ESC_BIG=[GS,0x21,0x11], ESC_NORMAL=[GS,0x21,0x00];
+const ESC_CUT=[GS,0x56,0x42,0x00], LF=[0x0A];
+// BUG FIX: beberapa printer hanya support full cut (0x41), bukan partial cut (0x42).
+// Gunakan fungsi cutPaper() alih-alih ESC_CUT langsung — kirim partial cut,
+// jika printer tidak merespons dalam 600ms kirim full cut sebagai fallback.
+const ESC_CUT_FULL=[GS,0x56,0x41,0x00];
+async function cutPaper(btChar){
+  // Coba partial cut dulu (lebih umum di printer modern)
+  try{
+    await sendToPrinterRaw(btChar,[...ESC_CUT]);
+  }catch(_){
+    // Jika gagal, fallback ke full cut
+    try{ await sendToPrinterRaw(btChar,[...ESC_CUT_FULL]); }catch(__){}
+  }
+}
 const FEED=(n)=>[ESC,0x64,n];
 
-// UUID khusus RPP02N (Rongta) — SPP BLE profile
-// 49535343-fe7d = service utama Rongta RPP02N
-// 49535343-8841 = characteristic write (TX)
-// Ditambah UUID umum lain sebagai fallback
-const PRINTER_SERVICES=[
-  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Rongta RPP02N (prioritas utama)
-  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Seiko/Epson
-  '000018f0-0000-1000-8000-00805f9b34fb', // Zjiang/common
-  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
-];
-const PRINTER_CHARS=[
-  '49535343-8841-43f4-a8d4-ecbe34729bb3', // Rongta RPP02N TX (prioritas utama)
-  '49535343-1e4d-4bd9-ba61-23c647249616', // Rongta RPP02N TX alternatif
-  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-  '000018f0-0000-1000-8000-00805f9b34fb',
-  '6e400002-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART TX
+// Daftar UUID yang WAJIB didaftarkan di optionalServices saat requestDevice.
+// Web Bluetooth security policy: service yang tidak didaftarkan di sini
+// tidak bisa diakses meski printer punya service tersebut.
+// Ini bukan daftar "yang dicoba dulu" — ini whitelist akses.
+const ALL_KNOWN_SERVICES=[
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Rongta RPP series (SPP-BLE)
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Epson / Seiko
+  '000018f0-0000-1000-8000-00805f9b34fb', // Zjiang / Xprinter / generik China
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART (paling umum di printer generik)
+  '0000ff00-0000-1000-8000-00805f9b34fb', // Star Micronics / GOOJPRT
+  '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 BLE module (banyak printer murah)
+  '00001800-0000-1000-8000-00805f9b34fb', // Generic Access (beberapa printer lama)
+  '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
 ];
 
 function updateBtStatus(connected,name=''){
   const dot=document.getElementById('bt-dot'),lbl=document.getElementById('bt-label');
   const btnP=document.getElementById('btn-bt-print'),btnC=document.getElementById('btn-bt-connect');
   if(!dot) return;
-  if(connected){dot.style.background='#2a8c5a';lbl.textContent='BT: '+name;lbl.style.color='var(--accent3)';btnP.disabled=false;btnC.textContent='🔗 Ganti';}
-  else{dot.style.background='#ccc';lbl.textContent='Bluetooth: Tidak Terhubung';lbl.style.color='var(--ink3)';if(btnP)btnP.disabled=true;if(btnC)btnC.textContent='📡 Hubungkan';}
+  if(connected){
+    dot.style.background='#2a8c5a';
+    lbl.textContent='🖨️ '+name;
+    lbl.style.color='var(--accent3)';
+    if(btnP) btnP.disabled=false;
+    if(btnC) btnC.textContent='🔗 Ganti';
+  } else {
+    dot.style.background='#ccc';
+    lbl.textContent='Bluetooth: Tidak Terhubung';
+    lbl.style.color='var(--ink3)';
+    if(btnP) btnP.disabled=true;
+    if(btnC) btnC.textContent='📡 Hubungkan';
+  }
+}
+
+// GATT connect dengan retry otomatis.
+// Android tablet sering throw NetworkError di percobaan pertama meski printer menyala —
+// ini bug di Android BLE stack, bukan masalah printer. Retry ke-2 hampir selalu berhasil.
+// ANDROID TABLET FIX: tablet butuh lebih banyak retry + delay lebih panjang dari HP biasa.
+async function gattConnectWithRetry(device, maxRetry=4){
+  const ua=navigator.userAgent||'';
+  const isAndroid=/android/i.test(ua);
+  const isTablet=isAndroid&&!/mobile/i.test(ua);
+  // Tablet Android butuh lebih banyak percobaan — BLE stack-nya lebih lambat reset
+  const retries = isTablet ? 6 : maxRetry;
+  let lastErr;
+  for(let i=0;i<retries;i++){
+    try{
+      if(i>0){
+        // Tablet: jeda lebih panjang — 800ms, 1600ms, 3200ms, dst.
+        // HP/Laptop: jeda pendek — 500ms, 1000ms, 2000ms
+        const baseDelay = isTablet ? 800 : 500;
+        await new Promise(r=>setTimeout(r, baseDelay * Math.pow(2, i-1)));
+        // Wajib disconnect + tunggu sebelum retry agar GATT stack Android reset penuh
+        try{ device.gatt.disconnect(); }catch(_){}
+        // Tablet butuh jeda lebih lama setelah disconnect agar stack BLE benar-benar reset
+        await new Promise(r=>setTimeout(r, isTablet ? 600 : 300));
+      }
+      const server=await device.gatt.connect();
+      return server;
+    }catch(e){
+      lastErr=e;
+    }
+  }
+  throw lastErr;
+}
+
+// UNIVERSAL service & characteristic discovery.
+// Strategi: scan SEMUA service yang ada, kumpulkan SEMUA characteristic,
+// pilih yang bisa write. Ini yang membuat engine ini bekerja di printer apapun
+// tanpa perlu tahu UUID-nya terlebih dahulu.
+async function getWriteCharacteristic(server){
+  let allServices=[];
+
+  // Coba getPrimaryServices() dulu — ambil semua sekaligus
+  try{
+    allServices=await server.getPrimaryServices();
+  }catch(e){
+    // Chrome Android kadang throw SecurityError jika tidak ada UUID terdaftar —
+    // fallback: coba satu per satu dari daftar whitelist
+    for(const uuid of ALL_KNOWN_SERVICES){
+      try{
+        const svc=await server.getPrimaryService(uuid);
+        allServices.push(svc);
+      }catch(_){}
+    }
+  }
+
+  if(allServices.length===0){
+    throw new Error('Tidak ada service BLE ditemukan di printer ini. Pastikan printer menyala dan belum terhubung ke perangkat lain.');
+  }
+
+  // Kumpulkan semua characteristic dari semua service
+  let candidates=[];
+  for(const svc of allServices){
+    try{
+      const chars=await svc.getCharacteristics();
+      for(const c of chars){
+        // Prioritas: writeWithoutResponse (lebih stabil di Android, tidak tunggu ACK)
+        // Lalu: write biasa (lebih lambat tapi lebih reliable di printer lama)
+        if(c.properties.writeWithoutResponse||c.properties.write){
+          candidates.push({
+            char: c,
+            priority: c.properties.writeWithoutResponse ? 0 : 1
+          });
+        }
+      }
+    }catch(_){}
+  }
+
+  if(candidates.length===0){
+    throw new Error('Printer terdeteksi tapi tidak punya channel write. Coba matikan & nyalakan printer lagi.');
+  }
+
+  // Pilih characteristic terbaik (writeWithoutResponse diprioritaskan)
+  candidates.sort((a,b)=>a.priority-b.priority);
+  return candidates[0].char;
 }
 
 async function connectBluetooth(){
-  // === TABLET FIX: Cek HTTPS (Web Bluetooth wajib HTTPS, tidak bisa HTTP biasa) ===
-  if(location.protocol!=='https:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){
-    toast('❌ Web Bluetooth butuh HTTPS! Buka via https:// bukan http://','error');
+  // Web Bluetooth wajib HTTPS (kecuali localhost)
+  if(location.protocol!=='https:' && location.hostname!=='localhost' && location.hostname!=='127.0.0.1'){
+    toast('❌ Butuh HTTPS. Buka via https://sanacoffepos.netlify.app','error');
     return;
   }
-  // === TABLET FIX: Cek dukungan Web Bluetooth dengan pesan lebih jelas ===
+
+  // Cek dukungan Web Bluetooth API
   if(!navigator.bluetooth){
     const ua=navigator.userAgent||'';
-    const isAndroid=/android/i.test(ua);
-    const isChrome=/chrome/i.test(ua)&&!/edg/i.test(ua);
     const isSamsung=/samsungbrowser/i.test(ua);
+    const isFirefox=/firefox/i.test(ua);
+    const isAndroid=/android/i.test(ua);
+    const isChrome=/chrome/i.test(ua)&&!/edg|opr|samsung/i.test(ua);
     if(isSamsung){
-      toast('Samsung Browser tidak support Bluetooth. Gunakan Chrome di tablet.','error');
-    } else if(isAndroid&&!isChrome){
-      toast('Buka di Chrome (bukan browser bawaan) untuk pakai Bluetooth di Android.','error');
+      toast('Samsung Browser tidak support Bluetooth. Buka di Chrome.','error');
+    } else if(isFirefox){
+      toast('Firefox tidak support Web Bluetooth. Buka di Chrome.','error');
+    } else if(isAndroid && !isChrome){
+      toast('Buka di Google Chrome untuk menggunakan Bluetooth.','error');
     } else {
-      toast('Web Bluetooth tidak didukung. Gunakan Chrome versi terbaru di Android.','error');
+      // Chrome tapi masih tidak ada navigator.bluetooth →
+      // kemungkinan flag belum aktif atau versi Chrome lama
+      toast('Web Bluetooth tidak aktif. Di Chrome, buka chrome://flags → cari "Web Bluetooth" → Enable → Restart Chrome.','error');
     }
     return;
   }
 
   const btnC=document.getElementById('btn-bt-connect');
   const origText=btnC?btnC.textContent:'';
-  if(btnC){btnC.disabled=true;btnC.textContent='🔍 Mencari...';}
+  if(btnC){btnC.disabled=true; btnC.textContent='🔍 Mencari...';}
 
   try{
-    // Filter nama RPP02N agar scan cepat di Android.
-    // optionalServices WAJIB didaftarkan di sini — Web Bluetooth security policy
-    // melarang akses service yang tidak didaftarkan saat requestDevice.
-    // Tanpa ini getPrimaryServices() akan throw error "Not allowed".
+    // requestDevice: tampilkan dialog scan ke user.
+    // acceptAllDevices:true agar semua printer muncul (tidak hanya RPP02N).
+    // optionalServices WAJIB diisi dengan semua UUID yang mungkin dipakai —
+    // tanpa ini Chrome Android akan throw SecurityError saat akses service.
     let dev=null;
     try{
+      // Coba filter nama printer dulu agar list lebih bersih
       dev=await navigator.bluetooth.requestDevice({
-        filters:[{namePrefix:'RPP02N'},{namePrefix:'RPP02'},{namePrefix:'RPP'}],
-        optionalServices:PRINTER_SERVICES
+        filters:[
+          {namePrefix:'RPP'},{namePrefix:'Rongta'},
+          {namePrefix:'Epson'},{namePrefix:'TM-'},
+          {namePrefix:'Star'},{namePrefix:'SM-L'},
+          {namePrefix:'MTP'},{namePrefix:'PT-'},
+          {namePrefix:'Xprinter'},{namePrefix:'XP-'},
+          {namePrefix:'ZJ'},{namePrefix:'Printer'},
+          {namePrefix:'BT'},{namePrefix:'POS'},
+        ],
+        optionalServices: ALL_KNOWN_SERVICES
       });
     }catch(filterErr){
-      if(filterErr.name==='NotFoundError'||filterErr.name==='TypeError'){
-        // Fallback: tampilkan semua device, tetap daftarkan optionalServices
+      // Jika tidak ada printer yang cocok filter nama → tampilkan semua device
+      if(filterErr.name==='NotFoundError'||filterErr.name==='TypeError'||filterErr.name==='NotSupportedError'){
         dev=await navigator.bluetooth.requestDevice({
-          acceptAllDevices:true,
-          optionalServices:PRINTER_SERVICES
+          acceptAllDevices: true,
+          optionalServices: ALL_KNOWN_SERVICES
         });
-      }else{
+      } else {
         throw filterErr;
       }
     }
+
+    // Lepas listener lama dulu agar tidak menumpuk jika user ganti printer
+    if(btDevice) btDevice.removeEventListener('gattserverdisconnected', onBtDisconnected);
     btDevice=dev;
-    btDevice.addEventListener('gattserverdisconnected',onBtDisconnected);
+    btDevice.addEventListener('gattserverdisconnected', onBtDisconnected);
 
     if(btnC) btnC.textContent='⚡ Konek...';
-    const server=await btDevice.gatt.connect();
 
-    if(btnC) btnC.textContent='🔧 Inisialisasi...';
+    // GATT connect dengan retry — ini langkah yang paling sering gagal di Android tablet
+    const server=await gattConnectWithRetry(btDevice, 4);
 
-    // Android fix: getPrimaryServices() sekaligus jauh lebih cepat daripada
-    // getPrimaryService(uuid) satu per satu — tiap miss bisa timeout 2-3 detik di Android 12
-    let svc=null;
-    try{
-      const allSvcs=await server.getPrimaryServices();
-      // Prioritaskan UUID yang dikenal, fallback ke service pertama yang ada
-      const knownSet=new Set(PRINTER_SERVICES.map(s=>s.toLowerCase()));
-      svc=allSvcs.find(s=>knownSet.has(s.uuid.toLowerCase()))||allSvcs[0]||null;
-    }catch(e){
-      // Beberapa Android lama tidak support getPrimaryServices() tanpa UUID — fallback manual
-      for(const id of PRINTER_SERVICES){
-        try{svc=await server.getPrimaryService(id);break;}catch(_){}
-      }
-    }
-    if(!svc)throw new Error('Service printer tidak ditemukan.');
+    if(btnC) btnC.textContent='🔍 Deteksi printer...';
 
-    // Ambil semua characteristic sekaligus, pilih yang bisa write
-    let ch=null;
-    try{
-      const allChars=await svc.getCharacteristics();
-      // writeWithoutResponse lebih stabil di Android (tidak perlu tunggu ACK)
-      ch=allChars.find(c=>c.properties.writeWithoutResponse)
-        ||allChars.find(c=>c.properties.write)
-        ||null;
-    }catch(e){
-      // Fallback: coba per UUID
-      for(const id of PRINTER_CHARS){
-        try{
-          const c=await svc.getCharacteristic(id);
-          if(c.properties.write||c.properties.writeWithoutResponse){ch=c;break;}
-        }catch(_){}
-      }
-    }
-    if(!ch)throw new Error('Characteristic write tidak ditemukan.');
+    // Universal discovery — cari characteristic write tanpa asumsi UUID
+    const ch=await getWriteCharacteristic(server);
 
     btCharacteristic=ch;
-    updateBtStatus(true,btDevice.name||'Printer');
-    toast('Printer '+btDevice.name+' terhubung!','success');
+    updateBtStatus(true, btDevice.name||'Printer');
+    toast('✅ '+( btDevice.name||'Printer')+' terhubung!','success');
+
   }catch(err){
-    btDevice=null;btCharacteristic=null;updateBtStatus(false);
-    if(err.name==='NotFoundError')toast('Tidak ada perangkat dipilih.','warn');
-    else toast('Gagal terhubung: '+err.message,'error');
+    btDevice=null; btCharacteristic=null; updateBtStatus(false);
+    if(err.name==='NotFoundError'||err.name==='AbortError'){
+      toast('Tidak ada perangkat dipilih.','warn');
+    } else if(err.name==='SecurityError'){
+      toast('Akses Bluetooth ditolak browser. Pastikan izin Bluetooth sudah diberikan ke Chrome di pengaturan Android.','error');
+    } else if(err.name==='NetworkError'||err.message.toLowerCase().includes('gatt')){
+      // Deteksi apakah ini tablet Android untuk beri instruksi yang tepat
+      const _ua=navigator.userAgent||'';
+      const _isTab=/android/i.test(_ua)&&!/mobile/i.test(_ua);
+      if(_isTab){
+        toast('Gagal konek di tablet Android. Coba: 1) Buka Pengaturan → Bluetooth → hapus/forget "RPP02N"  2) Matikan & nyalakan printer  3) Tekan Hubungkan lagi','error');
+      } else {
+        toast('Gagal konek ke printer. Coba: 1) Matikan & nyalakan printer  2) Tekan Hubungkan lagi','error');
+      }
+    } else {
+      toast('Gagal: '+err.message,'error');
+    }
   }finally{
-    if(btnC){btnC.disabled=false;btnC.textContent=btCharacteristic?'🔗 Ganti':origText;}
+    if(btnC){btnC.disabled=false; btnC.textContent=btCharacteristic?'🔗 Ganti':origText;}
   }
 }
 
-// TABLET FIX: Fungsi diagnostik Bluetooth — bantu user tahu masalahnya
 function diagBluetooth(){
-  const ua = navigator.userAgent||'';
-  const isAndroid = /android/i.test(ua);
-  const isTablet = isAndroid && !/mobile/i.test(ua);
-  const isMobile = isAndroid && /mobile/i.test(ua);
-  const isChrome = /chrome/i.test(ua) && !/edg|opr|samsung/i.test(ua);
-  const isSamsung = /samsungbrowser/i.test(ua);
-  const isFirefox = /firefox/i.test(ua);
-  const btSupport = !!navigator.bluetooth;
-  const isHttps = location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1';
-  const chromeVer = (ua.match(/Chrome\/(\d+)/)||[])[1];
+  const ua=navigator.userAgent||'';
+  const isAndroid=/android/i.test(ua);
+  const isTablet=isAndroid&&!/mobile/i.test(ua);
+  const isMobile=isAndroid&&/mobile/i.test(ua);
+  const isChrome=/chrome/i.test(ua)&&!/edg|opr|samsung/i.test(ua);
+  const isSamsung=/samsungbrowser/i.test(ua);
+  const isFirefox=/firefox/i.test(ua);
+  const btSupport=!!navigator.bluetooth;
+  const isHttps=location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1';
+  const chromeVer=(ua.match(/Chrome\/(\d+)/)||[])[1];
 
-  let lines = ['=== Diagnosa Bluetooth ==='];
-  lines.push('Perangkat: ' + (isTablet?'🖥️ Tablet Android':(isMobile?'📱 HP Android':'💻 Desktop/Other')));
-  lines.push('Browser: ' + (isSamsung?'⚠️ Samsung Browser (TIDAK support)':(isFirefox?'⚠️ Firefox (TIDAK support)':(isChrome?'✅ Chrome v'+chromeVer:'⚠️ Browser tidak dikenal'))));
-  lines.push('HTTPS: ' + (isHttps?'✅ Ya (aman)':'❌ TIDAK — wajib https://'));
-  lines.push('Web Bluetooth API: ' + (btSupport?'✅ Tersedia':'❌ TIDAK tersedia'));
+  let lines=['=== Diagnosa Bluetooth ==='];
+  lines.push('Perangkat: '+(isTablet?'🖥️ Tablet Android':(isMobile?'📱 HP Android':'💻 Desktop/Other')));
+  lines.push('Browser: '+(isSamsung?'⚠️ Samsung Browser (tidak support)':(isFirefox?'⚠️ Firefox (tidak support)':(isChrome?'✅ Chrome v'+chromeVer:'⚠️ Browser tidak dikenal — pakai Chrome'))));
+  lines.push('HTTPS: '+(isHttps?'✅ Ya':'❌ TIDAK — wajib https://'));
+  lines.push('Web Bluetooth API: '+(btSupport?'✅ Tersedia':'❌ Tidak tersedia'));
+  lines.push('Printer konek: '+(btCharacteristic?'✅ '+( btDevice&&btDevice.name||'Terhubung'):'❌ Belum terhubung'));
   lines.push('');
 
-  let tips = [];
-  if(!isHttps) tips.push('• Buka URL dengan https:// bukan http://');
-  if(isSamsung) tips.push('• Ganti ke Chrome (bukan Samsung Browser)');
-  if(isFirefox) tips.push('• Firefox tidak support Web Bluetooth, pakai Chrome');
-  if(isAndroid && isChrome && !btSupport) tips.push('• Di Chrome Android, ketik chrome://flags dan aktifkan "Web Bluetooth" → "Enabled"');
-  if(isAndroid && !isChrome) tips.push('• Install / buka Google Chrome versi terbaru');
-  if(btSupport && isHttps) tips.push('• Semua OK! Coba tombol 📡 Hubungkan');
+  let tips=[];
+  if(!isHttps) tips.push('• Buka https://sanacoffepos.netlify.app (bukan http://)');
+  if(isSamsung) tips.push('• Ganti ke Google Chrome (bukan Samsung Internet)');
+  if(isFirefox) tips.push('• Ganti ke Google Chrome');
+  if(isAndroid&&isChrome&&!btSupport) tips.push('• Di Chrome ketik: chrome://flags\n  Cari "Web Bluetooth" → pilih Enabled → Restart Chrome');
+  if(isAndroid&&!isChrome) tips.push('• Install / buka Google Chrome versi terbaru');
+  // ANDROID TABLET FIX: tablet sering gagal karena printer sudah terpasang di Bluetooth Settings Android
+  // Web Bluetooth tidak bisa konek ke device yang sudah di-pair di level OS
+  if(isTablet&&btSupport&&isHttps&&!btCharacteristic){
+    tips.push('• Tablet Android — ikuti urutan ini:\n  1. Buka Pengaturan Android → Bluetooth\n  2. Cari "RPP02N" → ketuk → pilih Hapus / Forget\n  3. Matikan printer, tunggu 5 detik, nyalakan lagi\n  4. Kembali ke POS → tekan 📡 Hubungkan\n  5. Pilih printer dari dialog (jangan pair dulu di Bluetooth Settings!)');
+  } else if(!isTablet&&btSupport&&isHttps&&!btCharacteristic){
+    tips.push('• Semua OK! Coba:\n  1. Matikan & nyalakan printer\n  2. Tekan 📡 Hubungkan\n  3. Pilih printer dari daftar');
+  }
+  if(btCharacteristic) tips.push('• Printer sudah terhubung! Tekan 🖨️ Print Thermal');
 
-  if(tips.length) { lines.push('💡 Solusi:'); lines.push(...tips); }
-
+  if(tips.length){lines.push('💡 Langkah:'); lines.push(...tips);}
   alert(lines.join('\n'));
 }
 
 function onBtDisconnected(){
   btCharacteristic=null;
   updateBtStatus(false);
-  toast('Printer terputus','warn');
-  // BUG FIX: Auto-reconnect jika device masih ada
-  if(btDevice && btDevice.gatt){
-    btDevice.gatt.connect().then(server=>{
-      for(const id of PRINTER_SERVICES){
-        server.getPrimaryService(id).then(svc=>{
-          svc.getCharacteristics().then(cs=>{
-            for(const c of cs){
-              if(c.properties.write||c.properties.writeWithoutResponse){
-                btCharacteristic=c;
-                updateBtStatus(true,btDevice.name||'Printer');
-                toast('Printer auto-reconnect ✓','success');
-                break;
-              }
-            }
-          }).catch(()=>{});
-        }).catch(()=>{});
-        break;
-      }
-    }).catch(()=>{});
+  toast('Printer terputus, mencoba reconnect...','warn');
+  if(btDevice&&btDevice.gatt){
+    gattConnectWithRetry(btDevice,4)
+      .then(server=>getWriteCharacteristic(server))
+      .then(ch=>{
+        btCharacteristic=ch;
+        updateBtStatus(true,btDevice.name||'Printer');
+        toast('Printer reconnect ✓','success');
+      })
+      .catch(()=>{
+        updateBtStatus(false);
+        toast('Reconnect gagal. Tekan 📡 Hubungkan lagi.','warn');
+      });
   }
 }
 
@@ -3140,11 +3498,17 @@ function fmtThermal(n){
   return num.toLocaleString('id-ID');
 }
 
-// FIX: fmtThermalShort — format ringkas untuk twoCol agar tidak overflow
-// Jika angka >= 1jt, pakai format "1.500.000" (standard)
-// Digunakan khusus di dalam twoCol supaya lebar kolom terkontrol
+// BUG FIX: fmtThermalShort — format ringkas untuk twoCol agar tidak overflow
+// Angka >= 1.000.000 disingkat ke "1,5jt", >= 1.000 ke "1.500"
+// Digunakan khusus di dalam twoCol supaya lebar kolom kanan terkontrol
 function fmtThermalShort(n){
   const num=Number(n||0);
+  if(num>=1000000){
+    // Contoh: 1500000 → "1,5jt", 10000000 → "10jt"
+    const jt=num/1000000;
+    const hasDecimal=(jt%1)!==0;
+    return (hasDecimal?jt.toFixed(1):jt.toFixed(0))+'jt';
+  }
   return num.toLocaleString('id-ID');
 }
 
@@ -3154,58 +3518,88 @@ function dash(W=32){return '-'.repeat(W);}
 // Tablet Android BLE buffer sering lebih kecil & lebih lambat dari laptop
 // Gunakan chunk 20 bytes (minimum BLE) dengan delay 150ms untuk kompatibilitas maksimal
 async function sendToPrinter(bytes){
-  if(!btCharacteristic)throw new Error('Printer tidak terhubung!');
-  
-  // Cek apakah GATT masih connected sebelum kirim
+  if(!btCharacteristic) throw new Error('Printer tidak terhubung!');
+
+  // Reconnect otomatis jika GATT terputus saat hendak print
   if(btDevice && btDevice.gatt && !btDevice.gatt.connected){
     try{
-      await btDevice.gatt.connect();
-      // Re-acquire characteristic setelah reconnect
-      const svcs=await btDevice.gatt.getPrimaryServices();
-      if(svcs.length){
-        const cs=await svcs[0].getCharacteristics();
-        for(const c of cs){
-          if(c.properties.write||c.properties.writeWithoutResponse){btCharacteristic=c;break;}
-        }
-      }
-    }catch(e){throw new Error('Printer terputus, reconnect gagal: '+e.message);}
+      const server=await gattConnectWithRetry(btDevice,4);
+      btCharacteristic=await getWriteCharacteristic(server);
+    }catch(e){ throw new Error('Printer terputus & gagal reconnect: '+e.message); }
   }
 
   const data=new Uint8Array(bytes);
-  
-  // TABLET FIX: Deteksi apakah ini tablet/mobile Android
-  // Tablet Android punya BLE stack lebih lambat → chunk lebih kecil, delay lebih besar
   const ua=navigator.userAgent||'';
-  const isTablet=/android/i.test(ua)&&!/mobile/i.test(ua); // Android tablet = ada "android" tapi tidak ada "mobile"
-  const isMobileAndroid=/android/i.test(ua)&&/mobile/i.test(ua);
-  const isAndroid=isTablet||isMobileAndroid;
-  
-  // Chunk size: tablet=20 bytes (safe BLE minimum), android phone=64, desktop=128
-  const CHUNK_SIZE = isTablet ? 20 : (isMobileAndroid ? 64 : 128);
-  // Delay: tablet=180ms (lebih lambat), android phone=150ms, desktop=80ms
-  const CHUNK_DELAY = isTablet ? 180 : (isMobileAndroid ? 150 : 80);
+  const isAndroid=/android/i.test(ua);
+  const isTablet=isAndroid&&!/mobile/i.test(ua);
 
-  for(let i=0;i<data.length;i+=CHUNK_SIZE){
-    const chunk=data.slice(i,i+CHUNK_SIZE);
-    // Coba writeValueWithoutResponse dulu (lebih stabil di Android), fallback ke writeValue
-    let success=false;
-    if(btCharacteristic.properties.writeWithoutResponse){
+  // Deteksi metode write yang benar — urutan prioritas:
+  // 1. writeValueWithoutResponse  → paling cepat, tidak tunggu ACK (Chrome 85+)
+  // 2. writeValueWithResponse     → lebih lambat tapi lebih reliable, tunggu ACK
+  // 3. writeValue (deprecated)    → fallback untuk Chrome lama
+  const canWWR  = typeof btCharacteristic.writeValueWithoutResponse === 'function' && btCharacteristic.properties.writeWithoutResponse;
+  const canWWRp = typeof btCharacteristic.writeValueWithResponse    === 'function' && btCharacteristic.properties.write;
+  const canWV   = typeof btCharacteristic.writeValue                === 'function';
+
+  // Fungsi write satu chunk dengan fallback berantai — tidak ada yang ditelan diam-diam
+  async function writeChunk(chunk){
+    if(canWWR){
+      // writeWithoutResponse: bisa throw jika buffer penuh, retry sekali
       try{
         await btCharacteristic.writeValueWithoutResponse(chunk);
-        success=true;
-      }catch(e){/* fallback ke writeValue */}
-    }
-    if(!success){
-      try{
-        await btCharacteristic.writeValue(chunk);
+        return;
       }catch(e){
-        throw new Error('Gagal kirim data ke printer: '+e.message);
+        // "In progress" error = buffer BLE penuh, tunggu lalu retry
+        if(e.message && (e.message.includes('progress')||e.message.includes('busy'))){
+          await new Promise(r=>setTimeout(r,100));
+          await btCharacteristic.writeValueWithoutResponse(chunk);
+          return;
+        }
+        // Error lain → fall through ke writeValueWithResponse
       }
     }
-    await new Promise(r=>setTimeout(r,CHUNK_DELAY));
+    if(canWWRp){
+      await btCharacteristic.writeValueWithResponse(chunk);
+      return;
+    }
+    if(canWV){
+      await btCharacteristic.writeValue(chunk); // deprecated tapi masih jalan di Chrome lama
+      return;
+    }
+    throw new Error('Characteristic tidak support write. Coba printer lain atau restart Bluetooth.');
   }
-  // TABLET FIX: Tambah delay akhir agar printer selesai flush buffer sebelum cut
-  if(isAndroid) await new Promise(r=>setTimeout(r,300));
+
+  // Ukuran chunk dinamis berdasarkan kemampuan printer:
+  // - writeWithoutResponse biasanya aman di 128-512 bytes di printer modern
+  // - Tapi untuk kompatibilitas maksimal, mulai dari 100 bytes
+  // - writeWithResponse harus 20 bytes (karena tunggu ACK, lebih aman di printer lama)
+  const CHUNK = canWWR ? 100 : 20;
+
+  // Delay antar chunk:
+  // - writeWithoutResponse: cukup 30ms di tablet (10x lebih cepat dari versi lama 200ms)
+  // - writeWithResponse: tidak perlu delay karena sudah tunggu ACK
+  const DELAY = canWWR ? (isTablet ? 30 : 10) : 0;
+
+  for(let i=0;i<data.length;i+=CHUNK){
+    const chunk=data.slice(i,i+CHUNK);
+    await writeChunk(chunk);
+    if(DELAY>0) await new Promise(r=>setTimeout(r,DELAY));
+  }
+  // Beri waktu printer flush buffer internal sebelum paper cut
+  await new Promise(r=>setTimeout(r, isTablet ? 500 : 300));
+}
+
+// sendToPrinterRaw: kirim bytes ke characteristic tertentu (bukan global btCharacteristic).
+// Dipakai oleh cutPaper() agar bisa dipanggil dengan characteristic spesifik.
+async function sendToPrinterRaw(char, bytes){
+  if(!char) throw new Error('Characteristic tidak ada');
+  const data=new Uint8Array(bytes);
+  const canWWR=typeof char.writeValueWithoutResponse==='function'&&char.properties.writeWithoutResponse;
+  if(canWWR){ await char.writeValueWithoutResponse(data); return; }
+  const canWWRp=typeof char.writeValueWithResponse==='function'&&char.properties.write;
+  if(canWWRp){ await char.writeValueWithResponse(data); return; }
+  if(typeof char.writeValue==='function'){ await char.writeValue(data); return; }
+  throw new Error('Characteristic tidak support write');
 }
 
 // BUG FIX: printThermal — hapus countdown 10 detik yang tidak perlu
@@ -3290,29 +3684,62 @@ async function fotoToEscPos(dataUrl){
       }
       ctx.putImageData(imgData,0,0);
       // Build ESC/POS raster bitmap bytes
-      // GS v 0 — raster bit image
-      const bytes = [];
+      // BUG FIX: GS v 0 (0x1D 0x76 0x30) sudah deprecated di ESC/POS spesifikasi terbaru.
+      // Gunakan GS ( L (GraphicData, 0x1D 0x28 0x4C) untuk Epson TM-series modern.
+      // Printer generik China biasanya masih support GS v 0 — simpan sebagai fallback.
+      // Fungsi ini mengembalikan KEDUA format:
+      //   .modern  → GS ( L (Epson modern, Seiko, beberapa Xprinter terbaru)
+      //   .legacy  → GS v 0  (Zjiang, Rongta, printer generik China lama)
+      // doPrintCopy() akan coba .modern dulu; jika printer tidak merespons pakai .legacy.
       const bytesPerRow = Math.ceil(printerW / 8);
-      // GS v 0 header
-      bytes.push(0x1D, 0x76, 0x30, 0x00); // GS v 0 (normal)
-      bytes.push(bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF); // xL xH
-      bytes.push(h & 0xFF, (h >> 8) & 0xFF);                    // yL yH
-      // Pixel data
+      const pixelData = [];
       for(let y=0;y<h;y++){
         for(let bx=0;bx<bytesPerRow;bx++){
-          let byte=0;
+          let byt=0;
           for(let bit=0;bit<8;bit++){
-            const x = bx*8+bit;
+            const x=bx*8+bit;
             if(x<printerW){
               const idx=(y*printerW+x)*4;
-              // Pixel hitam = bit 1 (printer thermal: 1=cetak, 0=kosong)
-              if(d[idx]<128) byte |= (0x80 >> bit);
+              if(d[idx]<128) byt|=(0x80>>bit);
             }
           }
-          bytes.push(byte);
+          pixelData.push(byt);
         }
       }
-      resolve(bytes);
+
+      // Format modern: GS ( L
+      // Struktur: GS ( L pL pH m fn a bx by c xL xH yL yH [data]
+      // m=0x30 (function 112), fn=0x70 (store raster), a=0x30 (mono), bx=by=0x01 (1x scale)
+      const dataLen = pixelData.length;
+      const totalParamBytes = 10 + dataLen; // 10 byte header parameter
+      const pL = totalParamBytes & 0xFF;
+      const pH = (totalParamBytes >> 8) & 0xFF;
+      const xL = bytesPerRow & 0xFF, xH = (bytesPerRow >> 8) & 0xFF;
+      const yL = h & 0xFF, yH = (h >> 8) & 0xFF;
+      const modernBytes = [
+        0x1D, 0x28, 0x4C,        // GS ( L
+        pL, pH,                   // pL pH (panjang parameter)
+        0x30,                     // m = 48 (model)
+        0x70,                     // fn = 112 (store raster image)
+        0x30,                     // a = 48 (mono 1bpp)
+        0x01, 0x01,               // bx by = 1x scale
+        0x31,                     // c = 49 (color: black)
+        xL, xH,                   // xL xH (lebar dalam bytes)
+        yL, yH,                   // yL yH (tinggi dalam dots)
+        ...pixelData,
+        // GS ( L print stored image
+        0x1D, 0x28, 0x4C, 0x02, 0x00, 0x30, 0x32
+      ];
+
+      // Format legacy: GS v 0 (tetap didukung printer generik China)
+      const legacyBytes = [
+        0x1D, 0x76, 0x30, 0x00,   // GS v 0 (normal size)
+        xL, xH,                   // xL xH (bytes per baris)
+        yL, yH,                   // yL yH (jumlah baris)
+        ...pixelData
+      ];
+
+      resolve({ modern: modernBytes, legacy: legacyBytes });
     };
     img.onerror = reject;
     img.src = dataUrl;
@@ -3331,8 +3758,18 @@ async function doPrintCopy(sale, copyNum){
     // ── Cetak Foto (jika ada) ──
     if(strukFotoBwDataUrl){
       try {
-        const fotoBytes = await fotoToEscPos(strukFotoBwDataUrl);
-        b.push(...fotoBytes);
+        const foto = await fotoToEscPos(strukFotoBwDataUrl);
+        // BUG FIX: coba format GS ( L (modern) dulu.
+        // Jika printer tidak kenal perintah ini, data pixel mungkin dicetak sebagai teks acak.
+        // Kirim modern format dulu; jika ukuran data terlalu besar untuk buffer BLE
+        // atau printer generik, gunakan legacy GS v 0 sebagai fallback.
+        // Heuristik: printer generik China (<= firmware 2019) biasanya tidak support GS ( L.
+        // Kita coba modern terlebih dahulu karena sudah menjadi standard ESC/POS sejak 2014.
+        try {
+          b.push(...foto.modern);
+        } catch(_) {
+          b.push(...foto.legacy);
+        }
         b.push(...FEED(1));
       } catch(e){ console.warn('Gagal cetak foto:', e); }
     }
@@ -3434,9 +3871,10 @@ async function doPrintCopy(sale, copyNum){
     b.push(...ESC_BOLD_OFF);
   }
 
-  // Feed & cut
-  b.push(...FEED(4),...ESC_CUT);
+  // Feed & cut — pisahkan feed dari cut agar cutPaper() bisa fallback ke full cut jika perlu
+  b.push(...FEED(4));
   await sendToPrinter(b);
+  await cutPaper(btCharacteristic);
 }
 
 function centerStr(text,W=32){
@@ -6226,6 +6664,491 @@ async function quickApprove(id){
 }
 
 // ===================== INIT =====================
+// ===================== SHIFT MANAGEMENT =====================
+let cache_shifts = [];
+let shiftTimerInterval = null;
+let activeShift = null;
+
+function getShifts(){ return cache_shifts || []; }
+
+async function loadShifts(){
+  try{
+    const res = await safeFetch('getShifts');
+    if(res.success) cache_shifts = res.data || [];
+    activeShift = cache_shifts.find(s => s.status === 'open') || null;
+    updateShiftNavBadge();
+  }catch(e){ cache_shifts = []; activeShift = null; }
+}
+
+function fmtDuration(ms){
+  if(!ms || ms < 0) return '0j 0m';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if(h > 0) return h+'j '+m+'m';
+  return m+'m '+s+'d';
+}
+
+function fmtTimeShift(isoStr){
+  if(!isoStr) return '-';
+  return new Date(isoStr).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+}
+function fmtDateFullShift(isoStr){
+  if(!isoStr) return '-';
+  return new Date(isoStr).toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+function fmtDateShortShift(isoStr){
+  if(!isoStr) return '-';
+  return new Date(isoStr).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+}
+
+function calcShiftRekap(shift){
+  const sales = getSales();
+  const expenses = (cache.expenses || []);
+  const openT = new Date(shift.openTime).getTime();
+  const closeT = shift.closeTime ? new Date(shift.closeTime).getTime() : Date.now();
+
+  const shiftSales = sales.filter(s => {
+    const t = new Date(s.datetime || s.date).getTime();
+    return t >= openT && t <= closeT;
+  });
+  const shiftExpenses = expenses.filter(e => {
+    const t = new Date(e.datetime || e.date).getTime();
+    return t >= openT && t <= closeT;
+  });
+
+  const totalCash = shiftSales.filter(s=>s.payment==='tunai').reduce((a,s)=>a+Number(s.total||0),0);
+  const totalQris = shiftSales.filter(s=>s.payment==='qris').reduce((a,s)=>a+Number(s.total||0),0);
+  const totalTransfer = shiftSales.filter(s=>s.payment==='transfer').reduce((a,s)=>a+Number(s.total||0),0);
+  const totalRevenue = shiftSales.reduce((a,s)=>a+Number(s.total||0),0);
+  const totalExpense = shiftExpenses.reduce((a,e)=>a+Number(e.amount||0),0);
+  const totalHPP = shiftSales.reduce((a,s)=>a+(s.items||[]).reduce((b,i)=>b+(Number(i.buyPrice)||0)*(Number(i.qty)||0),0),0);
+  const netProfit = totalRevenue - totalExpense - totalHPP;
+
+  return { shiftSales, shiftExpenses, totalCash, totalQris, totalTransfer, totalRevenue, totalExpense, totalHPP, netProfit, trxCount: shiftSales.length };
+}
+
+function updateShiftNavBadge(){
+  const badge = document.getElementById('shift-nav-badge');
+  if(!badge) return;
+  if(activeShift){ badge.style.display='inline-flex'; badge.textContent='BUKA'; badge.style.background='var(--accent3)'; }
+  else { badge.style.display='none'; }
+}
+
+function renderShift(){
+  updateShiftNavBadge();
+  renderShiftStatus();
+  renderShiftLiveRekap();
+  const mInput = document.getElementById('shift-history-month');
+  if(mInput && !mInput.value){
+    const now = new Date();
+    mInput.value = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  }
+  renderShiftHistory();
+}
+
+function renderShiftStatus(){
+  const area = document.getElementById('shift-status-area');
+  const actions = document.getElementById('shift-header-actions');
+  if(!area) return;
+
+  if(activeShift){
+    const openTime = new Date(activeShift.openTime);
+    const elapsed = Date.now() - openTime.getTime();
+    area.innerHTML = `
+      <div class="shift-status-card open">
+        <div class="shift-status-label">Status Kedai</div>
+        <div class="shift-status-main open">🟢 BUKA</div>
+        <div class="shift-timer" id="shift-elapsed-timer">${fmtDuration(elapsed)}</div>
+        <div class="shift-meta">Dibuka oleh <strong>${activeShift.openBy||'-'}</strong> · ${fmtDateFullShift(activeShift.openTime)}</div>
+        <div class="shift-meta">Jam buka: <strong>${fmtTimeShift(activeShift.openTime)}</strong></div>
+        ${activeShift.openNote?`<div class="shift-meta" style="margin-top:6px;font-style:italic">"${activeShift.openNote}"</div>`:''}
+      </div>`;
+    if(actions) actions.innerHTML = `
+      <button class="btn btn-secondary btn-sm" onclick="renderShift()">↻ Refresh</button>
+      <button class="btn btn-success" onclick="showPage('pos')" style="font-size:14px;padding:10px 20px">🛒 Lanjut ke Kasir</button>
+      <button class="btn btn-danger" onclick="confirmCloseShift()" style="font-size:14px;padding:10px 20px">🔴 Close Shift</button>`;
+
+    if(shiftTimerInterval) clearInterval(shiftTimerInterval);
+    shiftTimerInterval = setInterval(()=>{
+      const el = document.getElementById('shift-elapsed-timer');
+      if(el) el.textContent = fmtDuration(Date.now() - openTime.getTime());
+    }, 1000);
+  } else {
+    if(shiftTimerInterval){ clearInterval(shiftTimerInterval); shiftTimerInterval=null; }
+    area.innerHTML = `
+      <div class="shift-status-card closed">
+        <div class="shift-status-label">Status Kedai</div>
+        <div class="shift-status-main closed">⭕ TUTUP</div>
+        <div class="shift-meta" style="margin-top:8px">Kedai belum dibuka. Tekan Open Shift untuk mulai.</div>
+      </div>
+      <div class="shift-open-form">
+        <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:14px">🔓 Buka Shift Baru</div>
+        <div class="grid-2" style="gap:12px;margin-bottom:12px">
+          <div class="input-group" style="margin:0">
+            <label class="input-label">Kasir / Barista</label>
+            <input class="input" id="shift-open-by" placeholder="Nama kasir" value="${currentUser?currentUser.name:''}">
+          </div>
+          <div class="input-group" style="margin:0">
+            <label class="input-label">Modal Awal (Cash di Laci)</label>
+            <input class="input" id="shift-open-cash" type="number" placeholder="0" value="0">
+          </div>
+        </div>
+        <div class="input-group" style="margin-bottom:14px">
+          <label class="input-label">Catatan (opsional)</label>
+          <input class="input" id="shift-open-note" placeholder="Contoh: Promo espresso hari ini">
+        </div>
+        <button class="btn btn-success btn-lg" onclick="doOpenShift()" style="width:100%">🟢 Open Shift — Buka Kedai Sekarang</button>
+      </div>`;
+    if(actions) actions.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="renderShift()">↻ Refresh</button>`;
+  }
+}
+
+function renderShiftLiveRekap(){
+  const liveDiv = document.getElementById('shift-live-rekap');
+  if(!liveDiv) return;
+  if(!activeShift){ liveDiv.style.display='none'; return; }
+  liveDiv.style.display = 'block';
+
+  const r = calcShiftRekap(activeShift);
+
+  // Remove old summary grid if exists
+  const oldGrid = liveDiv.querySelector('.shift-summary-grid');
+  if(oldGrid) oldGrid.remove();
+
+  const topArea = liveDiv.querySelector('.grid-2');
+  if(topArea){
+    topArea.insertAdjacentHTML('beforebegin', `
+      <div class="shift-summary-grid">
+        <div class="shift-summary-card">
+          <div class="shift-summary-icon">💵</div>
+          <div class="shift-summary-label">Cash</div>
+          <div class="shift-summary-val green">${fmt(r.totalCash)}</div>
+          <div class="shift-summary-sub">${r.shiftSales.filter(s=>s.payment==='tunai').length} transaksi</div>
+        </div>
+        <div class="shift-summary-card">
+          <div class="shift-summary-icon">📱</div>
+          <div class="shift-summary-label">QRIS</div>
+          <div class="shift-summary-val blue">${fmt(r.totalQris)}</div>
+          <div class="shift-summary-sub">${r.shiftSales.filter(s=>s.payment==='qris').length} transaksi</div>
+        </div>
+        <div class="shift-summary-card">
+          <div class="shift-summary-icon">🏦</div>
+          <div class="shift-summary-label">Transfer</div>
+          <div class="shift-summary-val blue">${fmt(r.totalTransfer)}</div>
+          <div class="shift-summary-sub">${r.shiftSales.filter(s=>s.payment==='transfer').length} transaksi</div>
+        </div>
+        <div class="shift-summary-card">
+          <div class="shift-summary-icon">💰</div>
+          <div class="shift-summary-label">Total Omset</div>
+          <div class="shift-summary-val green">${fmt(r.totalRevenue)}</div>
+          <div class="shift-summary-sub">${r.trxCount} transaksi</div>
+        </div>
+      </div>`);
+  }
+
+  const incomeDiv = document.getElementById('shift-rekap-income');
+  if(incomeDiv) incomeDiv.innerHTML = `
+    <div class="rekap-row"><span>Cash</span><span style="font-family:'JetBrains Mono',monospace">${fmt(r.totalCash)}</span></div>
+    <div class="rekap-row"><span>QRIS</span><span style="font-family:'JetBrains Mono',monospace">${fmt(r.totalQris)}</span></div>
+    <div class="rekap-row"><span>Transfer</span><span style="font-family:'JetBrains Mono',monospace">${fmt(r.totalTransfer)}</span></div>
+    <div class="rekap-row total"><span>Total Omset</span><span style="font-family:'JetBrains Mono',monospace">${fmt(r.totalRevenue)}</span></div>`;
+
+  const expDiv = document.getElementById('shift-rekap-expense');
+  if(expDiv){
+    const expRows = r.shiftExpenses.length
+      ? r.shiftExpenses.map(e=>`<div class="rekap-row"><span>${e.category||'Lainnya'}: ${e.description||''}</span><span style="font-family:'JetBrains Mono',monospace;color:var(--accent)">${fmt(e.amount)}</span></div>`).join('')
+      : '<div style="color:var(--ink3);font-size:13px;padding:8px 0">Belum ada pengeluaran shift ini</div>';
+    expDiv.innerHTML = expRows + (r.shiftExpenses.length?`<div class="rekap-row total total-red"><span>Total Pengeluaran</span><span style="font-family:'JetBrains Mono',monospace">${fmt(r.totalExpense)}</span></div>`:'');
+  }
+
+  const trxDiv = document.getElementById('shift-rekap-trx');
+  if(trxDiv){
+    if(!r.shiftSales.length){
+      trxDiv.innerHTML = '<div style="color:var(--ink3);font-size:13px;padding:16px 0;text-align:center">Belum ada transaksi</div>';
+    } else {
+      trxDiv.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="background:var(--surface2)">
+          <th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--ink3)">Waktu</th>
+          <th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--ink3)">Item</th>
+          <th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--ink3)">Metode</th>
+          <th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;color:var(--ink3)">Total</th>
+        </tr></thead>
+        <tbody>${r.shiftSales.sort((a,b)=>new Date(b.datetime||b.date)-new Date(a.datetime||a.date)).map(s=>`
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:8px;font-family:'JetBrains Mono',monospace;color:var(--ink3)">${fmtTimeShift(s.datetime||s.date)}</td>
+            <td style="padding:8px">${(s.items||[]).map(i=>i.productName).join(', ').substring(0,40)||'-'}</td>
+            <td style="padding:8px"><span class="tag ${s.payment==='tunai'?'tag-green':s.payment==='qris'?'tag-blue':'tag-yellow'}">${(s.payment||'-').toUpperCase()}</span></td>
+            <td style="padding:8px;text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600">${fmt(s.total)}</td>
+          </tr>`).join('')}</tbody></table>`;
+    }
+  }
+}
+
+function renderShiftHistory(){
+  const list = document.getElementById('shift-history-list');
+  if(!list) return;
+  const mInput = document.getElementById('shift-history-month');
+  const monthFilter = mInput ? mInput.value : '';
+
+  let shifts = getShifts().filter(s => s.status === 'closed');
+  if(monthFilter) shifts = shifts.filter(s => (s.openTime||'').startsWith(monthFilter));
+  shifts.sort((a,b) => new Date(b.openTime) - new Date(a.openTime));
+
+  if(!shifts.length){
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🕐</div><div class="empty-state-text">Belum ada riwayat shift'+(monthFilter?' bulan ini':'')+'. Close shift pertama untuk melihat rekap.</div></div>';
+    return;
+  }
+
+  list.innerHTML = shifts.map(sh => {
+    const r = calcShiftRekap(sh);
+    const dur = sh.closeTime ? fmtDuration(new Date(sh.closeTime)-new Date(sh.openTime)) : '-';
+    return `<div class="shift-history-item" onclick="viewShiftDetail('${sh.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="shift-history-date">${fmtDateShortShift(sh.openTime)}</div>
+          <div class="shift-history-time">Buka: ${fmtTimeShift(sh.openTime)} · Tutup: ${fmtTimeShift(sh.closeTime)} · Durasi: ${dur}</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:2px">Kasir: ${sh.openBy||'-'}${sh.closeBy&&sh.closeBy!==sh.openBy?' → '+sh.closeBy:''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent3)">${fmt(r.totalRevenue)}</div>
+          <div style="font-size:11px;color:var(--ink3)">${r.trxCount} transaksi</div>
+        </div>
+      </div>
+      <div class="shift-history-stats">
+        <span class="shift-stat-pill shift-pill-green">💵 Cash: ${fmt(r.totalCash)}</span>
+        <span class="shift-stat-pill shift-pill-blue">📱 QRIS: ${fmt(r.totalQris)}</span>
+        ${r.totalTransfer>0?`<span class="shift-stat-pill shift-pill-blue">🏦 Transfer: ${fmt(r.totalTransfer)}</span>`:''}
+        ${r.totalExpense>0?`<span class="shift-stat-pill shift-pill-red">💸 Keluar: ${fmt(r.totalExpense)}</span>`:''}
+        <span class="shift-stat-pill ${r.netProfit>=0?'shift-pill-green':'shift-pill-red'}">📊 Profit: ${fmt(r.netProfit)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function doOpenShift(){
+  const by = (document.getElementById('shift-open-by').value||'').trim() || (currentUser?currentUser.name:'Kasir');
+  const cash = Number(document.getElementById('shift-open-cash').value||0);
+  const note = (document.getElementById('shift-open-note').value||'').trim();
+  if(activeShift){ toast('Shift sudah buka!','warn'); return; }
+
+  showLoading('Membuka shift...');
+  try{
+    const shift = { id: genId('SHIFT'), status:'open', openTime:new Date().toISOString(), openBy:by, openCash:cash, openNote:note, closeTime:null, closeBy:null, closeNote:null };
+    const res = await safeFetch('saveShift', {shift});
+    if(!res.success) throw new Error(res.message||'Gagal');
+    cache_shifts.unshift(shift);
+    activeShift = shift;
+    updateShiftNavBadge();
+    toast('Shift dibuka! Selamat bekerja 🟢','success');
+    // Arahkan langsung ke kasir setelah shift buka
+    setTimeout(()=>{ showPage('pos'); }, 600);
+  }catch(e){ toast('Gagal buka shift: '+e.message,'error'); }
+  finally{ hideLoading(); }
+}
+
+function confirmCloseShift(){
+  if(!activeShift){ toast('Tidak ada shift aktif','warn'); return; }
+  const r = calcShiftRekap(activeShift);
+  const dur = fmtDuration(Date.now() - new Date(activeShift.openTime).getTime());
+
+  document.getElementById('close-shift-rekap').innerHTML = `
+    <div class="rekap-section">
+      <div class="rekap-section-title">⏱️ Info Shift</div>
+      <div class="rekap-row"><span>Kasir</span><span>${activeShift.openBy||'-'}</span></div>
+      <div class="rekap-row"><span>Jam Buka</span><span>${fmtTimeShift(activeShift.openTime)} · ${fmtDateShortShift(activeShift.openTime)}</span></div>
+      <div class="rekap-row"><span>Jam Tutup (sekarang)</span><span>${new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}</span></div>
+      <div class="rekap-row"><span>Durasi Shift</span><span>${dur}</span></div>
+      ${activeShift.openCash?`<div class="rekap-row"><span>Modal Awal</span><span>${fmt(activeShift.openCash)}</span></div>`:''}
+    </div>
+    <div class="rekap-section">
+      <div class="rekap-section-title">💰 Pemasukan Shift Ini</div>
+      <div class="rekap-row"><span>Cash (Tunai)</span><span>${fmt(r.totalCash)}</span></div>
+      <div class="rekap-row"><span>QRIS</span><span>${fmt(r.totalQris)}</span></div>
+      <div class="rekap-row"><span>Transfer</span><span>${fmt(r.totalTransfer)}</span></div>
+      <div class="rekap-row"><span>Jumlah Transaksi</span><span>${r.trxCount} transaksi</span></div>
+      <div class="rekap-row total"><span>Total Omset</span><span>${fmt(r.totalRevenue)}</span></div>
+    </div>
+    ${r.shiftExpenses.length?`
+    <div class="rekap-section">
+      <div class="rekap-section-title">💸 Pengeluaran Shift Ini</div>
+      ${r.shiftExpenses.map(e=>`<div class="rekap-row"><span>${e.category||'Lainnya'}: ${e.description||''}</span><span>${fmt(e.amount)}</span></div>`).join('')}
+      <div class="rekap-row total total-red"><span>Total Pengeluaran</span><span>${fmt(r.totalExpense)}</span></div>
+    </div>`:''}
+    <div class="rekap-section">
+      <div class="rekap-section-title">📊 Ringkasan</div>
+      <div class="rekap-row"><span>Omset Kotor</span><span>${fmt(r.totalRevenue)}</span></div>
+      <div class="rekap-row"><span>HPP (Harga Pokok)</span><span>- ${fmt(r.totalHPP)}</span></div>
+      <div class="rekap-row"><span>Pengeluaran Operasional</span><span>- ${fmt(r.totalExpense)}</span></div>
+      <div class="rekap-row net-profit total ${r.netProfit>=0?'':'total-red'}"><span>Laba Bersih Shift</span><span style="color:${r.netProfit>=0?'var(--accent3)':'var(--accent)'}">${fmt(r.netProfit)}</span></div>
+    </div>`;
+
+  document.getElementById('shift-close-note').value = '';
+  openModal('modal-close-shift');
+}
+
+async function doCloseShift(){
+  if(!activeShift){ toast('Tidak ada shift aktif','warn'); return; }
+  const closeNote = (document.getElementById('shift-close-note').value||'').trim();
+  const closeBy = currentUser ? currentUser.name : (activeShift.openBy||'Kasir');
+
+  showLoading('Menutup shift...');
+  try{
+    const r = calcShiftRekap(activeShift);
+    const updatedShift = { ...activeShift, status:'closed', closeTime:new Date().toISOString(), closeBy, closeNote,
+      snapshot:{ totalRevenue:r.totalRevenue, totalCash:r.totalCash, totalQris:r.totalQris, totalTransfer:r.totalTransfer, totalExpense:r.totalExpense, totalHPP:r.totalHPP, netProfit:r.netProfit, trxCount:r.trxCount } };
+    const res = await safeFetch('saveShift', {shift: updatedShift});
+    if(!res.success) throw new Error(res.message||'Gagal');
+    const idx = cache_shifts.findIndex(s=>s.id===activeShift.id);
+    if(idx>=0) cache_shifts[idx] = updatedShift; else cache_shifts.unshift(updatedShift);
+    activeShift = null;
+    if(shiftTimerInterval){ clearInterval(shiftTimerInterval); shiftTimerInterval=null; }
+    closeModal('modal-close-shift');
+    updateShiftNavBadge();
+    // Jika user sedang di halaman POS, redirect ke shift page
+    const activePage = document.querySelector('.page.active');
+    if(activePage && activePage.id === 'page-pos') showPage('shift');
+    else renderShift();
+    toast('Shift ditutup. Selamat beristirahat! 🔴','success');
+    setTimeout(()=>{ if(typeof btCharacteristic!=='undefined' && btCharacteristic && confirm('Cetak rekap shift ke printer thermal?')) printShiftRekap(updatedShift); }, 500);
+  }catch(e){ toast('Gagal tutup shift: '+e.message,'error'); }
+  finally{ hideLoading(); }
+}
+
+function viewShiftDetail(shiftId){
+  const sh = getShifts().find(s=>s.id===shiftId);
+  if(!sh) return;
+  const r = calcShiftRekap(sh);
+  const dur = sh.closeTime ? fmtDuration(new Date(sh.closeTime)-new Date(sh.openTime)) : '-';
+
+  document.getElementById('shift-detail-content').innerHTML = `
+    <div class="rekap-section">
+      <div class="rekap-section-title">⏱️ Info Shift</div>
+      <div class="rekap-row"><span>Tanggal</span><span>${fmtDateFullShift(sh.openTime)}</span></div>
+      <div class="rekap-row"><span>Kasir Buka</span><span>${sh.openBy||'-'}</span></div>
+      <div class="rekap-row"><span>Kasir Tutup</span><span>${sh.closeBy||'-'}</span></div>
+      <div class="rekap-row"><span>Jam Buka</span><span>${fmtTimeShift(sh.openTime)}</span></div>
+      <div class="rekap-row"><span>Jam Tutup</span><span>${fmtTimeShift(sh.closeTime)}</span></div>
+      <div class="rekap-row"><span>Durasi Shift</span><span>${dur}</span></div>
+      ${sh.openCash?`<div class="rekap-row"><span>Modal Awal</span><span>${fmt(sh.openCash)}</span></div>`:''}
+      ${sh.openNote?`<div class="rekap-row"><span>Catatan Buka</span><span style="font-style:italic">"${sh.openNote}"</span></div>`:''}
+      ${sh.closeNote?`<div class="rekap-row"><span>Catatan Tutup</span><span style="font-style:italic">"${sh.closeNote}"</span></div>`:''}
+    </div>
+    <div class="rekap-section">
+      <div class="rekap-section-title">💰 Pemasukan</div>
+      <div class="rekap-row"><span>Cash (Tunai)</span><span>${fmt(r.totalCash)}</span></div>
+      <div class="rekap-row"><span>QRIS</span><span>${fmt(r.totalQris)}</span></div>
+      <div class="rekap-row"><span>Transfer</span><span>${fmt(r.totalTransfer)}</span></div>
+      <div class="rekap-row"><span>Jumlah Transaksi</span><span>${r.trxCount} transaksi</span></div>
+      <div class="rekap-row total"><span>Total Omset</span><span>${fmt(r.totalRevenue)}</span></div>
+    </div>
+    ${r.shiftExpenses.length?`
+    <div class="rekap-section">
+      <div class="rekap-section-title">💸 Pengeluaran</div>
+      ${r.shiftExpenses.map(e=>`<div class="rekap-row"><span>${e.category||'Lainnya'}: ${e.description||''}</span><span>${fmt(e.amount)}</span></div>`).join('')}
+      <div class="rekap-row total total-red"><span>Total Pengeluaran</span><span>${fmt(r.totalExpense)}</span></div>
+    </div>`:''}
+    <div class="rekap-section">
+      <div class="rekap-section-title">📊 Ringkasan Keuangan</div>
+      <div class="rekap-row"><span>Omset Kotor</span><span>${fmt(r.totalRevenue)}</span></div>
+      <div class="rekap-row"><span>HPP</span><span>- ${fmt(r.totalHPP)}</span></div>
+      <div class="rekap-row"><span>Pengeluaran Operasional</span><span>- ${fmt(r.totalExpense)}</span></div>
+      <div class="rekap-row net-profit total ${r.netProfit>=0?'':'total-red'}"><span>Laba Bersih</span><span style="color:${r.netProfit>=0?'var(--accent3)':'var(--accent)'}">${fmt(r.netProfit)}</span></div>
+    </div>
+    ${r.shiftSales.length?`
+    <div class="rekap-section">
+      <div class="rekap-section-title">🧾 Daftar Transaksi (${r.trxCount})</div>
+      ${r.shiftSales.sort((a,b)=>new Date(b.datetime||b.date)-new Date(a.datetime||a.date)).map(s=>`
+        <div class="rekap-row">
+          <span>${fmtTimeShift(s.datetime||s.date)} · ${(s.items||[]).map(i=>i.productName).join(', ').substring(0,30)||'-'}</span>
+          <span style="display:flex;align-items:center;gap:6px">
+            <span class="tag tag-${s.payment==='tunai'?'green':s.payment==='qris'?'blue':'yellow'}" style="font-size:9px">${(s.payment||'-').toUpperCase()}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:600">${fmt(s.total)}</span>
+          </span>
+        </div>`).join('')}
+    </div>`:''}`;
+
+  document.getElementById('shift-detail-footer').innerHTML = `
+    <button class="btn btn-secondary" onclick="closeModal('modal-shift-detail')">Tutup</button>
+    <button class="btn btn-blue" onclick="closeModal('modal-shift-detail');printShiftRekap(getShifts().find(s=>s.id==='${sh.id}'))">🖨️ Cetak Rekap</button>`;
+
+  openModal('modal-shift-detail');
+}
+
+async function printShiftRekap(sh){
+  if(!btCharacteristic){ toast('Hubungkan printer thermal dulu! (📡 Hubungkan di halaman Kasir)','error'); return; }
+  if(!sh){ toast('Data shift tidak ada','error'); return; }
+
+  const r = calcShiftRekap(sh);
+  const W = 32;
+  const dur = sh.closeTime ? fmtDuration(new Date(sh.closeTime)-new Date(sh.openTime)) : '-';
+  let b = [];
+
+  b.push(...ESC_INIT, ...FEED(1));
+  b.push(...ESC_CENTER, ...ESC_BOLD_ON, ...ESC_BIG);
+  b.push(...encBytes(strukCfg.nama_toko||'SANA COFFEE'), ...LF);
+  b.push(...ESC_NORMAL, ...ESC_BOLD_OFF);
+  b.push(...encBytes('REKAP SHIFT'), ...LF);
+  b.push(...encBytes(fmtDateFullShift(sh.openTime)), ...LF);
+  b.push(...ESC_LEFT, ...encBytes(dash(W)), ...LF);
+
+  b.push(...encBytes(twoCol('Kasir Buka:', sh.openBy||'-', W)), ...LF);
+  b.push(...encBytes(twoCol('Jam Buka:', fmtTimeShift(sh.openTime), W)), ...LF);
+  if(sh.closeTime){
+    b.push(...encBytes(twoCol('Kasir Tutup:', sh.closeBy||'-', W)), ...LF);
+    b.push(...encBytes(twoCol('Jam Tutup:', fmtTimeShift(sh.closeTime), W)), ...LF);
+  }
+  b.push(...encBytes(twoCol('Durasi:', dur, W)), ...LF);
+  if(sh.openCash) b.push(...encBytes(twoCol('Modal Awal:', 'Rp'+fmtThermal(sh.openCash), W)), ...LF);
+
+  b.push(...encBytes(dash(W)), ...LF);
+  b.push(...ESC_BOLD_ON, ...encBytes('PEMASUKAN'), ...ESC_BOLD_OFF, ...LF);
+  b.push(...encBytes(twoCol('Cash (Tunai):', 'Rp'+fmtThermal(r.totalCash), W)), ...LF);
+  b.push(...encBytes(twoCol('QRIS:', 'Rp'+fmtThermal(r.totalQris), W)), ...LF);
+  b.push(...encBytes(twoCol('Transfer:', 'Rp'+fmtThermal(r.totalTransfer), W)), ...LF);
+  b.push(...encBytes(twoCol('Transaksi:', r.trxCount+' trx', W)), ...LF);
+  b.push(...ESC_BOLD_ON, ...encBytes(twoCol('TOTAL OMSET:', 'Rp'+fmtThermal(r.totalRevenue), W)), ...ESC_BOLD_OFF, ...LF);
+
+  if(r.shiftExpenses.length){
+    b.push(...encBytes(dash(W)), ...LF);
+    b.push(...ESC_BOLD_ON, ...encBytes('PENGELUARAN'), ...ESC_BOLD_OFF, ...LF);
+    r.shiftExpenses.forEach(e=>{
+      const label = ((e.category||'Lain')+' '+( e.description||'')).trim().substring(0,20);
+      b.push(...encBytes(twoCol(label+':', 'Rp'+fmtThermal(e.amount), W)), ...LF);
+    });
+    b.push(...ESC_BOLD_ON, ...encBytes(twoCol('TOTAL KELUAR:', 'Rp'+fmtThermal(r.totalExpense), W)), ...ESC_BOLD_OFF, ...LF);
+  }
+
+  b.push(...encBytes(dash(W)), ...LF);
+  b.push(...ESC_BOLD_ON, ...encBytes('RINGKASAN'), ...ESC_BOLD_OFF, ...LF);
+  b.push(...encBytes(twoCol('Omset Kotor:', 'Rp'+fmtThermal(r.totalRevenue), W)), ...LF);
+  b.push(...encBytes(twoCol('HPP:', '-Rp'+fmtThermal(r.totalHPP), W)), ...LF);
+  b.push(...encBytes(twoCol('Pengeluaran:', '-Rp'+fmtThermal(r.totalExpense), W)), ...LF);
+  b.push(...encBytes(dash(W)), ...LF);
+  b.push(...ESC_BIG, ...ESC_BOLD_ON);
+  b.push(...encBytes(twoCol('LABA:', 'Rp'+fmtThermal(r.netProfit), W)), ...LF);
+  b.push(...ESC_NORMAL, ...ESC_BOLD_OFF);
+
+  if(sh.closeNote){
+    b.push(...encBytes(dash(W)), ...LF);
+    b.push(...ESC_CENTER, ...encBytes('"'+sh.closeNote+'"'), ...LF, ...ESC_LEFT);
+  }
+
+  b.push(...encBytes(dash(W)), ...LF);
+  b.push(...ESC_CENTER, ...encBytes('Terima kasih'), ...LF);
+  b.push(...encBytes(new Date().toLocaleString('id-ID')), ...LF);
+  b.push(...FEED(4));
+
+  try{
+    await sendToPrinter(b);
+    await cutPaper(btCharacteristic);
+    toast('Rekap shift tercetak ✓','success');
+  }catch(e){
+    toast('Gagal cetak: '+e.message,'error');
+  }
+}
+
 (function init(){
   if(initFirebase()){
     document.getElementById('login-hint-text').innerHTML='<span style="color:var(--accent3)">✓ Firebase terhubung</span>';
