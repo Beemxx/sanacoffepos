@@ -1323,7 +1323,6 @@ canvas{width:100%!important}
       <button class="btn btn-secondary" onclick="connectBluetooth()" id="btn-bt-connect" title="Hubungkan ke thermal printer Bluetooth">📡 Hubungkan</button>
       <button class="btn btn-success" onclick="printThermal()" id="btn-bt-print" disabled title="Print ke thermal printer Bluetooth">🖨️ Print Thermal</button>
       <button class="btn btn-blue" onclick="printReceipt()" id="btn-print-receipt" title="Print struk via printer WiFi/USB (dialog print sistem)">🖨️ Print Struk</button>
-      <button class="btn btn-secondary btn-sm" onclick="diagBluetooth()" title="Cek apakah Bluetooth bisa dipakai di perangkat ini" style="font-size:11px;padding:6px 10px">🔍 Cek BT</button>
       <button class="btn btn-primary" onclick="closeModal('modal-receipt');renderPOS()">✓ Selesai</button>
     </div>
   </div>
@@ -2245,12 +2244,7 @@ function doLogout(){
   // yang sempat pakai btDevice/btCharacteristic setelah logout dimulai.
   // Disconnect di-wrap Promise + .catch() agar tidak throw uncaught rejection
   // jika GATT sudah disconnected atau printer sedang kirim data.
-  if(_nativeBtDeviceId){
-    const _devId=_nativeBtDeviceId;
-    _nativeBtDeviceId=null; btCharacteristic=null;
-    const _bc=getBleClient();
-    if(_bc) Promise.resolve().then(()=>_bc.disconnect(_devId)).catch(()=>{});
-  } else if(btDevice){
+  if(btDevice){
     const _dev=btDevice;
     btDevice=null; btCharacteristic=null;
     Promise.resolve().then(()=>_dev.gatt.disconnect()).catch(()=>{});
@@ -3022,7 +3016,7 @@ async function showReceipt(sale){
   // BUG FIX: wrap dalam try-catch agar modal tetap terbuka meski Firebase lambat/gagal
   try { await loadStrukSettings(); } catch(e){ console.warn('loadStrukSettings gagal:', e.message); }
   // Refresh BT status indicator whenever receipt opens
-  setTimeout(()=>updateBtStatus(!!(btCharacteristic||_nativeBtDeviceId), _nativeBtDeviceId?_nativeBtDeviceId:(btDevice?btDevice.name:'')),100);
+  setTimeout(()=>updateBtStatus(!!btCharacteristic, btDevice?btDevice.name:''),100);
   // Baris header kustom (multi-line support)
   const headerLines=(strukCfg.header_custom||'').split('\n').filter(Boolean).map(l=>`<div class="receipt-center"><small>${l}</small></div>`).join('');
   // Baris footer kustom (multi-line support)
@@ -3121,553 +3115,270 @@ function printReceipt(){
   }, delay);
 }
 
-// ===================== BLUETOOTH THERMAL PRINTER — DUAL MODE ENGINE =====================
-//
-// DUAL MODE:
-//   1. Capacitor Native BLE  → dipakai saat berjalan di dalam Android app (Capacitor)
-//      Plugin: @capacitor-community/bluetooth-le
-//      Tidak perlu HTTPS, tidak perlu navigator.bluetooth, permission dari native Android
-//
-//   2. Web Bluetooth API     → dipakai saat berjalan di browser (Chrome/Edge desktop/Android)
-//      Universal engine: scan semua service/characteristic tanpa asumsi UUID
-//      Kompatibel: Rongta RPP, Epson TM, Star, Zjiang, Xprinter, GOOJPRT, generik China
-//
-// DETEKSI OTOMATIS:
-//   isCapacitorNative() → true  : pakai path native Capacitor BLE
-//   isCapacitorNative() → false : pakai path Web Bluetooth (browser)
-
-let btDevice=null, btCharacteristic=null, lastSaleData=null;
-let _nativeBtDeviceId=null; // device ID untuk Capacitor native mode
-const ESC=0x1B, GS=0x1D;
-const ESC_INIT=[ESC,0x40];
-const ESC_CENTER=[ESC,0x61,0x01], ESC_LEFT=[ESC,0x61,0x00];
-const ESC_BOLD_ON=[ESC,0x45,0x01], ESC_BOLD_OFF=[ESC,0x45,0x00];
-const ESC_BIG=[GS,0x21,0x11], ESC_NORMAL=[GS,0x21,0x00];
-const ESC_CUT=[GS,0x56,0x42,0x00], LF=[0x0A];
-const ESC_CUT_FULL=[GS,0x56,0x41,0x00];
-async function cutPaper(btChar){
-  // Native Capacitor mode: pakai sendToPrinter() langsung (routing sudah ada di sana)
-  if(isCapacitorNative() && _nativeBtDeviceId){
-    try{ await sendToPrinter([...ESC_CUT]); }catch(_){
-      try{ await sendToPrinter([...ESC_CUT_FULL]); }catch(__) {}
-    }
-    return;
-  }
-  // Web Bluetooth mode: pakai sendToPrinterRaw dengan characteristic
-  if(!btChar || btChar==='__native__') return; // guard jika char tidak valid
-  try{
-    await sendToPrinterRaw(btChar,[...ESC_CUT]);
-  }catch(_){
-    try{ await sendToPrinterRaw(btChar,[...ESC_CUT_FULL]); }catch(__) {}
-  }
-}
+// ===================== BLUETOOTH THERMAL PRINTER =====================
+let btDevice=null,btCharacteristic=null,lastSaleData=null;
+const ESC=0x1B,GS=0x1D;
+const ESC_INIT=[ESC,0x40],ESC_CENTER=[ESC,0x61,0x01],ESC_LEFT=[ESC,0x61,0x00];
+const ESC_BOLD_ON=[ESC,0x45,0x01],ESC_BOLD_OFF=[ESC,0x45,0x00];
+const ESC_BIG=[GS,0x21,0x11],ESC_NORMAL=[GS,0x21,0x00];
+const ESC_CUT=[GS,0x56,0x42,0x00],LF=[0x0A];
 const FEED=(n)=>[ESC,0x64,n];
 
-// UUID whitelist untuk Web Bluetooth optionalServices
-const ALL_KNOWN_SERVICES=[
-  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Rongta RPP series (SPP-BLE)
-  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Epson / Seiko
-  '000018f0-0000-1000-8000-00805f9b34fb', // Zjiang / Xprinter / generik China
-  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART (paling umum di printer generik)
-  '0000ff00-0000-1000-8000-00805f9b34fb', // Star Micronics / GOOJPRT
-  '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 BLE module (banyak printer murah)
-  '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
-  '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
+// UUID khusus RPP02N (Rongta) — SPP BLE profile
+// 49535343-fe7d = service utama Rongta RPP02N
+// 49535343-8841 = characteristic write (TX)
+// Ditambah UUID umum lain sebagai fallback
+const PRINTER_SERVICES=[
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Rongta RPP02N (prioritas utama)
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Seiko/Epson
+  '000018f0-0000-1000-8000-00805f9b34fb', // Zjiang/common
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
+];
+const PRINTER_CHARS=[
+  '49535343-8841-43f4-a8d4-ecbe34729bb3', // Rongta RPP02N TX (prioritas utama)
+  '49535343-1e4d-4bd9-ba61-23c647249616', // Rongta RPP02N TX alternatif
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  '6e400002-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART TX
 ];
 
-// ── DETEKSI MODE ──────────────────────────────────────────────────────
-function isCapacitorNative(){
-  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-}
-function getBleClient(){
-  try{
-    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BleClient)
-      return window.Capacitor.Plugins.BleClient;
-  }catch(e){}
-  return null;
-}
-
-// ── STATUS INDICATOR ─────────────────────────────────────────────────
 function updateBtStatus(connected,name=''){
   const dot=document.getElementById('bt-dot'),lbl=document.getElementById('bt-label');
   const btnP=document.getElementById('btn-bt-print'),btnC=document.getElementById('btn-bt-connect');
   if(!dot) return;
-  if(connected){
-    dot.style.background='#2a8c5a';
-    lbl.textContent='🖨️ '+name;
-    lbl.style.color='var(--accent3)';
-    if(btnP) btnP.disabled=false;
-    if(btnC) btnC.textContent='🔗 Ganti';
-  } else {
-    dot.style.background='#ccc';
-    lbl.textContent='Bluetooth: Tidak Terhubung';
-    lbl.style.color='var(--ink3)';
-    if(btnP) btnP.disabled=true;
-    if(btnC) btnC.textContent='📡 Hubungkan';
-  }
+  if(connected){dot.style.background='#2a8c5a';lbl.textContent='BT: '+name;lbl.style.color='var(--accent3)';btnP.disabled=false;btnC.textContent='🔗 Ganti';}
+  else{dot.style.background='#ccc';lbl.textContent='Bluetooth: Tidak Terhubung';lbl.style.color='var(--ink3)';if(btnP)btnP.disabled=true;if(btnC)btnC.textContent='📡 Hubungkan';}
 }
 
-// ── CONNECT — ENTRY POINT ────────────────────────────────────────────
 async function connectBluetooth(){
+  if(!navigator.bluetooth){toast('Web Bluetooth tidak didukung. Gunakan Chrome/Edge di Android atau desktop.','error');return;}
+
   const btnC=document.getElementById('btn-bt-connect');
-  const origText=btnC?btnC.textContent:'📡 Hubungkan';
-  if(btnC){btnC.disabled=true; btnC.textContent='🔍 Mencari...';}
+  const origText=btnC?btnC.textContent:'';
+  if(btnC){btnC.disabled=true;btnC.textContent='🔍 Mencari...';}
+
   try{
-    if(isCapacitorNative()){
-      await _connectBluetoothNative(btnC);
-    } else {
-      await _connectBluetoothWeb(btnC);
-    }
-  }catch(err){
-    // Reset state jika koneksi gagal
-    btDevice=null; btCharacteristic=null; _nativeBtDeviceId=null;
-    updateBtStatus(false);
-    if(err.name==='NotFoundError'||err.name==='AbortError'||err.message==='cancelled'){
-      toast('Tidak ada perangkat dipilih.','warn');
-    } else if(err.name==='SecurityError'){
-      toast('Akses Bluetooth ditolak. Berikan izin Bluetooth ke aplikasi di pengaturan.','error');
-    } else if(err.name==='NetworkError'||err.message.toLowerCase().includes('gatt')){
-      toast('Gagal konek ke printer. Coba: 1) Matikan & nyalakan printer  2) Tekan Hubungkan lagi','error');
-    } else {
-      toast('Gagal: '+err.message,'error');
-    }
-  }finally{
-    if(btnC){
-      btnC.disabled=false;
-      btnC.textContent=(btCharacteristic||_nativeBtDeviceId)?'🔗 Ganti':origText;
-    }
-  }
-}
-
-// ── MODE 1: CAPACITOR NATIVE BLE (Android app) ───────────────────────
-async function _connectBluetoothNative(btnC){
-  const BleClient=getBleClient();
-  if(!BleClient) throw new Error(
-    'Plugin BleClient tidak ditemukan.\n'+
-    'Pastikan @capacitor-community/bluetooth-le terinstall\n'+
-    'dan didaftarkan di MainActivity.java / capacitor.config.ts'
-  );
-
-  if(btnC) btnC.textContent='⚡ Inisialisasi...';
-  await BleClient.initialize({androidNeverForLocation:true});
-
-  // Putus koneksi lama jika ada
-  if(_nativeBtDeviceId){
-    try{ await BleClient.disconnect(_nativeBtDeviceId); }catch(e){}
-    _nativeBtDeviceId=null;
-    btCharacteristic=null;
-  }
-
-  if(btnC) btnC.textContent='🔍 Scan printer...';
-
-  // requestDevice → tampilkan dialog scan native Android
-  // Ini memastikan permission & dialog muncul dari sistem Android (lebih reliable)
-  const device = await BleClient.requestDevice({
-    // Tampilkan semua BLE device — filter printer dari nama setelah pilih
-    optionalServices: ALL_KNOWN_SERVICES,
-  });
-
-  if(!device || !device.deviceId) throw new Error('cancelled');
-
-  if(btnC) btnC.textContent='⚡ Konek...';
-  await BleClient.connect(device.deviceId, (deviceId)=>{
-    // onDisconnect callback — dipanggil saat printer terputus
-    _nativeBtDeviceId=null;
-    btCharacteristic=null;
-    updateBtStatus(false);
-    toast('Printer terputus','warn');
-    // Auto-reconnect
-    setTimeout(()=>{
-      if(deviceId){
-        BleClient.connect(deviceId,()=>{}).then(()=>{
-          _nativeBtDeviceId=deviceId;
-          btCharacteristic='__native__';
-          updateBtStatus(true, device.name||deviceId);
-          toast('Printer reconnect ✓','success');
-        }).catch(()=>{
-          toast('Reconnect gagal. Tekan 📡 Hubungkan lagi.','warn');
-        });
-      }
-    }, 2000);
-  });
-
-  _nativeBtDeviceId=device.deviceId;
-  // btCharacteristic diset ke sentinel '__native__' sebagai tanda "native mode aktif"
-  // sendToPrinter() akan cek _nativeBtDeviceId untuk memilih path native
-  btCharacteristic='__native__';
-  const printerName=device.name||device.deviceId;
-  updateBtStatus(true, printerName);
-  toast('✅ '+printerName+' terhubung! (Native)','success');
-}
-
-// ── MODE 2: WEB BLUETOOTH (browser Chrome/Edge) ───────────────────────
-async function _connectBluetoothWeb(btnC){
-  // Cek HTTPS
-  if(location.protocol!=='https:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){
-    throw new Error('Butuh HTTPS. Buka via https://');
-  }
-  if(!navigator.bluetooth){
-    const ua=navigator.userAgent||'';
-    if(/samsungbrowser/i.test(ua)) throw new Error('Samsung Browser tidak support Bluetooth. Buka di Chrome.');
-    if(/firefox/i.test(ua)) throw new Error('Firefox tidak support Web Bluetooth. Buka di Chrome.');
-    if(/android/i.test(ua)) throw new Error('Buka di Google Chrome untuk menggunakan Bluetooth.');
-    throw new Error('Web Bluetooth tidak aktif. Di Chrome, buka chrome://flags → cari "Web Bluetooth" → Enable → Restart.');
-  }
-
-  let dev=null;
-  try{
-    dev=await navigator.bluetooth.requestDevice({
-      filters:[
-        {namePrefix:'RPP'},{namePrefix:'Rongta'},
-        {namePrefix:'Epson'},{namePrefix:'TM-'},
-        {namePrefix:'Star'},{namePrefix:'SM-L'},
-        {namePrefix:'MTP'},{namePrefix:'PT-'},
-        {namePrefix:'Xprinter'},{namePrefix:'XP-'},
-        {namePrefix:'ZJ'},{namePrefix:'Printer'},
-        {namePrefix:'BT'},{namePrefix:'POS'},
-      ],
-      optionalServices: ALL_KNOWN_SERVICES
-    });
-  }catch(filterErr){
-    if(filterErr.name==='NotFoundError'||filterErr.name==='TypeError'||filterErr.name==='NotSupportedError'){
+    // Filter nama RPP02N agar scan cepat di Android.
+    // optionalServices WAJIB didaftarkan di sini — Web Bluetooth security policy
+    // melarang akses service yang tidak didaftarkan saat requestDevice.
+    // Tanpa ini getPrimaryServices() akan throw error "Not allowed".
+    let dev=null;
+    try{
       dev=await navigator.bluetooth.requestDevice({
-        acceptAllDevices:true,
-        optionalServices: ALL_KNOWN_SERVICES
+        filters:[{namePrefix:'RPP02N'},{namePrefix:'RPP02'},{namePrefix:'RPP'}],
+        optionalServices:PRINTER_SERVICES
       });
-    } else {
-      throw filterErr;
-    }
-  }
-
-  // Lepas listener lama agar tidak menumpuk jika user ganti printer
-  if(btDevice) btDevice.removeEventListener('gattserverdisconnected', onBtDisconnected);
-  btDevice=dev;
-  btDevice.addEventListener('gattserverdisconnected', onBtDisconnected);
-
-  if(btnC) btnC.textContent='⚡ Konek...';
-  const server=await gattConnectWithRetry(btDevice, 4);
-
-  if(btnC) btnC.textContent='🔍 Deteksi printer...';
-  const ch=await getWriteCharacteristic(server);
-
-  btCharacteristic=ch;
-  updateBtStatus(true, btDevice.name||'Printer');
-  toast('✅ '+(btDevice.name||'Printer')+' terhubung!','success');
-}
-
-// ── WEB: GATT CONNECT WITH RETRY ─────────────────────────────────────
-async function gattConnectWithRetry(device, maxRetry=4){
-  const ua=navigator.userAgent||'';
-  const isAndroid=/android/i.test(ua);
-  const isTablet=isAndroid&&!/mobile/i.test(ua);
-  const retries=isTablet?6:maxRetry;
-  let lastErr;
-  for(let i=0;i<retries;i++){
-    try{
-      if(i>0){
-        const baseDelay=isTablet?800:500;
-        await new Promise(r=>setTimeout(r,baseDelay*Math.pow(2,i-1)));
-        try{device.gatt.disconnect();}catch(_){}
-        await new Promise(r=>setTimeout(r,isTablet?600:300));
+    }catch(filterErr){
+      if(filterErr.name==='NotFoundError'||filterErr.name==='TypeError'){
+        // Fallback: tampilkan semua device, tetap daftarkan optionalServices
+        dev=await navigator.bluetooth.requestDevice({
+          acceptAllDevices:true,
+          optionalServices:PRINTER_SERVICES
+        });
+      }else{
+        throw filterErr;
       }
-      return await device.gatt.connect();
-    }catch(e){lastErr=e;}
-  }
-  throw lastErr;
-}
-
-// ── WEB: UNIVERSAL SERVICE/CHAR DISCOVERY ────────────────────────────
-async function getWriteCharacteristic(server){
-  let allServices=[];
-  try{
-    allServices=await server.getPrimaryServices();
-  }catch(e){
-    for(const uuid of ALL_KNOWN_SERVICES){
-      try{allServices.push(await server.getPrimaryService(uuid));}catch(_){}
     }
+    btDevice=dev;
+    btDevice.addEventListener('gattserverdisconnected',onBtDisconnected);
+
+    if(btnC) btnC.textContent='⚡ Konek...';
+    const server=await btDevice.gatt.connect();
+
+    if(btnC) btnC.textContent='🔧 Inisialisasi...';
+
+    // Cari service — prioritaskan UUID Rongta RPP02N dulu
+    let svc=null;
+    for(const id of PRINTER_SERVICES){
+      try{svc=await server.getPrimaryService(id);break;}catch(e){}
+    }
+    // Fallback: ambil service pertama yang tersedia
+    if(!svc){
+      try{const ss=await server.getPrimaryServices();if(ss.length)svc=ss[0];}catch(e){}
+    }
+    if(!svc)throw new Error('Service printer tidak ditemukan.');
+
+    // Cari characteristic write — prioritaskan UUID Rongta RPP02N dulu
+    let ch=null;
+    for(const id of PRINTER_CHARS){
+      try{
+        const c=await svc.getCharacteristic(id);
+        if(c.properties.write||c.properties.writeWithoutResponse){ch=c;break;}
+      }catch(e){}
+    }
+    // Fallback: scan semua characteristic, pilih yang bisa write
+    if(!ch){
+      try{
+        const cs=await svc.getCharacteristics();
+        ch=cs.find(c=>c.properties.writeWithoutResponse)||cs.find(c=>c.properties.write)||null;
+      }catch(e){}
+    }
+    if(!ch)throw new Error('Characteristic write tidak ditemukan.');
+
+    btCharacteristic=ch;
+    updateBtStatus(true,btDevice.name||'Printer');
+    toast('Printer '+btDevice.name+' terhubung!','success');
+  }catch(err){
+    btDevice=null;btCharacteristic=null;updateBtStatus(false);
+    if(err.name==='NotFoundError')toast('Tidak ada perangkat dipilih.','warn');
+    else toast('Gagal terhubung: '+err.message,'error');
+  }finally{
+    if(btnC){btnC.disabled=false;btnC.textContent=btCharacteristic?'🔗 Ganti':origText;}
   }
-  if(allServices.length===0){
-    throw new Error('Tidak ada service BLE ditemukan. Pastikan printer menyala dan belum terhubung ke perangkat lain.');
-  }
-  let candidates=[];
-  for(const svc of allServices){
-    try{
-      const chars=await svc.getCharacteristics();
-      for(const c of chars){
-        if(c.properties.writeWithoutResponse||c.properties.write){
-          candidates.push({char:c, priority:c.properties.writeWithoutResponse?0:1});
-        }
-      }
-    }catch(_){}
-  }
-  if(candidates.length===0){
-    throw new Error('Printer terdeteksi tapi tidak punya channel write. Coba matikan & nyalakan printer lagi.');
-  }
-  candidates.sort((a,b)=>a.priority-b.priority);
-  return candidates[0].char;
 }
 
-// ── WEB: DISCONNECT HANDLER & AUTO-RECONNECT ─────────────────────────
 function onBtDisconnected(){
   btCharacteristic=null;
   updateBtStatus(false);
-  toast('Printer terputus, mencoba reconnect...','warn');
-  if(btDevice&&btDevice.gatt){
-    gattConnectWithRetry(btDevice,4)
-      .then(server=>getWriteCharacteristic(server))
-      .then(ch=>{
-        btCharacteristic=ch;
-        updateBtStatus(true,btDevice.name||'Printer');
-        toast('Printer reconnect ✓','success');
-      })
-      .catch(()=>{
-        updateBtStatus(false);
-        toast('Reconnect gagal. Tekan 📡 Hubungkan lagi.','warn');
-      });
+  toast('Printer terputus','warn');
+  // BUG FIX: Auto-reconnect jika device masih ada
+  if(btDevice && btDevice.gatt){
+    btDevice.gatt.connect().then(server=>{
+      for(const id of PRINTER_SERVICES){
+        server.getPrimaryService(id).then(svc=>{
+          svc.getCharacteristics().then(cs=>{
+            for(const c of cs){
+              if(c.properties.write||c.properties.writeWithoutResponse){
+                btCharacteristic=c;
+                updateBtStatus(true,btDevice.name||'Printer');
+                toast('Printer auto-reconnect ✓','success');
+                break;
+              }
+            }
+          }).catch(()=>{});
+        }).catch(()=>{});
+        break;
+      }
+    }).catch(()=>{});
   }
 }
 
-// ── DIAGNOSA BLUETOOTH (browser only) ────────────────────────────────
-function diagBluetooth(){
-  if(isCapacitorNative()){
-    const connected=!!(_nativeBtDeviceId);
-    alert([
-      '=== Diagnosa Bluetooth (Mode Aplikasi) ===',
-      'Mode: ✅ Capacitor Native BLE',
-      'Plugin BleClient: '+(getBleClient()?'✅ Tersedia':'❌ Tidak ditemukan — install @capacitor-community/bluetooth-le'),
-      'Printer konek: '+(connected?'✅ '+_nativeBtDeviceId:'❌ Belum terhubung'),
-      '',
-      connected?'Printer sudah terhubung! Tekan 🖨️ Print Thermal':'Tekan 📡 Hubungkan untuk memilih printer.',
-    ].join('\n'));
-    return;
-  }
-  const ua=navigator.userAgent||'';
-  const isAndroid=/android/i.test(ua);
-  const isTablet=isAndroid&&!/mobile/i.test(ua);
-  const isMobile=isAndroid&&/mobile/i.test(ua);
-  const isChrome=/chrome/i.test(ua)&&!/edg|opr|samsung/i.test(ua);
-  const isSamsung=/samsungbrowser/i.test(ua);
-  const isFirefox=/firefox/i.test(ua);
-  const btSupport=!!navigator.bluetooth;
-  const isHttps=location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1';
-  const chromeVer=(ua.match(/Chrome\/(\d+)/)||[])[1];
-  let lines=['=== Diagnosa Bluetooth (Mode Browser) ==='];
-  lines.push('Perangkat: '+(isTablet?'🖥️ Tablet Android':(isMobile?'📱 HP Android':'💻 Desktop/Other')));
-  lines.push('Browser: '+(isSamsung?'⚠️ Samsung Browser (tidak support)':(isFirefox?'⚠️ Firefox (tidak support)':(isChrome?'✅ Chrome v'+chromeVer:'⚠️ Pakai Chrome'))));
-  lines.push('HTTPS: '+(isHttps?'✅ Ya':'❌ TIDAK — wajib https://'));
-  lines.push('Web Bluetooth API: '+(btSupport?'✅ Tersedia':'❌ Tidak tersedia'));
-  lines.push('Printer konek: '+(btCharacteristic&&btCharacteristic!=='__native__'?'✅ '+(btDevice&&btDevice.name||'Terhubung'):'❌ Belum terhubung'));
-  let tips=[];
-  if(!isHttps) tips.push('• Buka via https://');
-  if(isSamsung) tips.push('• Ganti ke Google Chrome');
-  if(isFirefox) tips.push('• Ganti ke Google Chrome');
-  if(isAndroid&&isChrome&&!btSupport) tips.push('• Di Chrome: chrome://flags → "Web Bluetooth" → Enable → Restart');
-  if(isTablet&&btSupport&&isHttps&&!btCharacteristic){
-    tips.push('• Tablet: Pengaturan → Bluetooth → hapus/forget printer → matikan printer → nyalakan → Hubungkan');
-  }
-  if(tips.length){lines.push('');lines.push('💡 Langkah:');lines.push(...tips);}
-  alert(lines.join('\n'));
-}
-
-// ── ENCODING ESC/POS ─────────────────────────────────────────────────
+// BUG FIX: encBytes — encoding yang benar untuk thermal ESC/POS
+// Karakter ASCII biasa (0-127) langsung, karakter non-ASCII di-encode pakai CP437/Latin-1
+// Karakter Rp (Rupiah sign U+20AC) → 'Rp' plaintext, non-ASCII → '?' (63)
 function encBytes(text){
   const b=[];
   const s=String(text||'');
   for(let i=0;i<s.length;i++){
     const c=s.charCodeAt(i);
-    if(c<128){b.push(c);}
-    else if(c===0x00D7){b.push(0x78);}         // × → x
-    else if(c===0x2019||c===0x0027){b.push(0x27);} // smart quote → '
-    else if(c===0x2018||c===0x0060){b.push(0x60);}
-    else if(c===0x2013||c===0x2014){b.push(0x2D);} // dash → -
-    else if(c===0x20AC){b.push(0x45);}         // € → E
-    else if(c>=0xC0&&c<=0xFF){b.push(c&0xFF);}
-    else{b.push(0x3F);}                         // unknown → ?
+    if(c<128){
+      b.push(c);
+    } else if(c===0x2019||c===0x0027){ // smart quote → apostrophe
+      b.push(0x27);
+    } else if(c===0x2018||c===0x0060){ // backtick/open quote
+      b.push(0x60);
+    } else if(c>=0xC0&&c<=0xFF){ // Latin-1 Extended (accented chars)
+      b.push(c&0xFF); // beberapa printer ESC/POS support CP437 (Latin-1 range)
+    } else {
+      b.push(0x3F); // '?'
+    }
   }
   return b;
 }
 
+// BUG FIX: twoCol — hitung panjang string dengan benar
+// Sebelumnya String(r).length tidak dihitung saat menentukan spasi
 function twoCol(l,r,W=32){
   const rs=String(r||'');
   let ls=String(l||'');
-  if(rs.length>=W) return rs.substring(0,W);
+  // Truncate kiri jika total melebihi lebar kertas (sisakan 1 spasi + kolom kanan)
   const maxLeft=W-rs.length-1;
   if(ls.length>maxLeft) ls=ls.substring(0,Math.max(1,maxLeft));
   const spaces=W-ls.length-rs.length;
   return ls+' '.repeat(Math.max(1,spaces))+rs;
 }
 
+// BUG FIX: fmtThermal — format angka tanpa titik/koma untuk thermal printer
+// Gunakan format sederhana agar font monospace tidak salah render
 function fmtThermal(n){
   const num=Number(n||0);
-  return num.toLocaleString('id-ID');
-}
-
-function fmtThermalShort(n){
-  const num=Number(n||0);
-  if(num>=1000000){
-    const jt=num/1000000;
-    return ((jt%1!==0)?jt.toFixed(1):jt.toFixed(0))+'jt';
-  }
+  // Format dengan separator titik (Indonesian style) tapi tanpa simbol 'Rp'
   return num.toLocaleString('id-ID');
 }
 
 function dash(W=32){return '-'.repeat(W);}
 
-// ── SEND DATA TO PRINTER ──────────────────────────────────────────────
+// BUG FIX: sendToPrinter — chunk lebih kecil & delay lebih besar untuk Android
+// Android BLE buffer biasanya 20-512 bytes, delay minimal 80-120ms antar chunk
 async function sendToPrinter(bytes){
-  if(!btCharacteristic&&!_nativeBtDeviceId) throw new Error('Printer tidak terhubung!');
-
-  // ── PATH NATIVE (Capacitor) ──
-  if(isCapacitorNative()&&_nativeBtDeviceId){
-    const BleClient=getBleClient();
-    if(!BleClient) throw new Error('BleClient plugin tidak ada.');
-    const data=new Uint8Array(bytes);
-    const CHUNK=180;
-    // Cari service & characteristic yang bisa write (scan saat pertama kirim)
-    let services=[];
-    try{ services=await BleClient.getServices(_nativeBtDeviceId); }catch(e){}
-    // Jika getServices gagal, coba pakai UUID yang diketahui langsung
-    let writeTarget=null; // {serviceUUID, characteristicUUID}
-    if(services&&services.length){
-      outer: for(const svc of services){
-        for(const ch of (svc.characteristics||[])){
-          const props=ch.properties||{};
-          if(props.writeWithoutResponse||props.write){
-            writeTarget={serviceUUID:svc.uuid, characteristicUUID:ch.uuid};
-            break outer;
-          }
-        }
-      }
-    }
-    // Fallback: coba semua kombinasi UUID yang diketahui
-    if(!writeTarget){
-      const KNOWN_CHARS=[
-        '49535343-8841-43f4-a8d4-ecbe34729bb3',
-        '49535343-1e4d-4bd9-ba61-23c647249616',
-        '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
-        '0000ff02-0000-1000-8000-00805f9b34fb',
-        '0000ffe1-0000-1000-8000-00805f9b34fb',
-      ];
-      search: for(const svcId of ALL_KNOWN_SERVICES){
-        for(const charId of KNOWN_CHARS){
-          try{
-            const testData=new DataView(new Uint8Array([ESC_INIT[0]]).buffer);
-            await BleClient.writeWithoutResponse(_nativeBtDeviceId,svcId,charId,testData);
-            writeTarget={serviceUUID:svcId,characteristicUUID:charId};
-            break search;
-          }catch(e){
-            try{
-              const testData=new DataView(new Uint8Array([ESC_INIT[0]]).buffer);
-              await BleClient.write(_nativeBtDeviceId,svcId,charId,testData);
-              writeTarget={serviceUUID:svcId,characteristicUUID:charId};
-              break search;
-            }catch(e2){}
-          }
-        }
-      }
-    }
-    if(!writeTarget) throw new Error('Tidak dapat menemukan channel write printer. Coba putus & hubungkan ulang.');
-    // Kirim data dalam chunk
-    for(let i=0;i<data.length;i+=CHUNK){
-      const chunk=data.slice(i,i+CHUNK);
-      const dv=new DataView(chunk.buffer,chunk.byteOffset,chunk.byteLength);
-      try{
-        await BleClient.writeWithoutResponse(_nativeBtDeviceId,writeTarget.serviceUUID,writeTarget.characteristicUUID,dv);
-      }catch(e){
-        await BleClient.write(_nativeBtDeviceId,writeTarget.serviceUUID,writeTarget.characteristicUUID,dv);
-      }
-      await new Promise(r=>setTimeout(r,80));
-    }
-    return;
-  }
-
-  // ── PATH WEB BLUETOOTH (browser) ──
-  if(btDevice&&btDevice.gatt&&!btDevice.gatt.connected){
+  if(!btCharacteristic)throw new Error('Printer tidak terhubung!');
+  
+  // BUG FIX: Cek apakah GATT masih connected sebelum kirim
+  if(btDevice && btDevice.gatt && !btDevice.gatt.connected){
     try{
-      const server=await gattConnectWithRetry(btDevice,4);
-      btCharacteristic=await getWriteCharacteristic(server);
-    }catch(e){throw new Error('Printer terputus & gagal reconnect: '+e.message);}
-  }
-  const data=new Uint8Array(bytes);
-  const ua=navigator.userAgent||'';
-  const isAndroid=/android/i.test(ua);
-  const isTablet=isAndroid&&!/mobile/i.test(ua);
-  const canWWR=typeof btCharacteristic.writeValueWithoutResponse==='function'&&btCharacteristic.properties.writeWithoutResponse;
-  const canWWRp=typeof btCharacteristic.writeValueWithResponse==='function'&&btCharacteristic.properties.write;
-  const canWV=typeof btCharacteristic.writeValue==='function';
-  async function writeChunk(chunk){
-    if(canWWR){
-      try{await btCharacteristic.writeValueWithoutResponse(chunk);return;}
-      catch(e){
-        if(e.message&&(e.message.includes('progress')||e.message.includes('busy'))){
-          await new Promise(r=>setTimeout(r,100));
-          await btCharacteristic.writeValueWithoutResponse(chunk);
-          return;
+      await btDevice.gatt.connect();
+      // Re-acquire characteristic setelah reconnect
+      const svcs=await btDevice.gatt.getPrimaryServices();
+      if(svcs.length){
+        const cs=await svcs[0].getCharacteristics();
+        for(const c of cs){
+          if(c.properties.write||c.properties.writeWithoutResponse){btCharacteristic=c;break;}
         }
       }
-    }
-    if(canWWRp){await btCharacteristic.writeValueWithResponse(chunk);return;}
-    if(canWV){await btCharacteristic.writeValue(chunk);return;}
-    throw new Error('Characteristic tidak support write.');
+    }catch(e){throw new Error('Printer terputus, reconnect gagal: '+e.message);}
   }
-  const CHUNK=canWWR?100:20;
-  const DELAY=canWWR?(isTablet?30:10):0;
-  for(let i=0;i<data.length;i+=CHUNK){
-    const chunk=data.slice(i,i+CHUNK);
-    await writeChunk(chunk);
-    if(DELAY>0) await new Promise(r=>setTimeout(r,DELAY));
-  }
-  await new Promise(r=>setTimeout(r,isTablet?500:300));
-}
 
-// sendToPrinterRaw: kirim bytes ke characteristic tertentu (dipakai cutPaper)
-async function sendToPrinterRaw(char, bytes){
-  if(!char) throw new Error('Characteristic tidak ada');
   const data=new Uint8Array(bytes);
-  // Native mode: char berisi object {serviceUUID, characteristicUUID}
-  if(isCapacitorNative()&&_nativeBtDeviceId&&char&&char.serviceUUID){
-    const BleClient=getBleClient();
-    const dv=new DataView(data.buffer);
-    try{await BleClient.writeWithoutResponse(_nativeBtDeviceId,char.serviceUUID,char.characteristicUUID,dv);return;}
-    catch(e){await BleClient.write(_nativeBtDeviceId,char.serviceUUID,char.characteristicUUID,dv);}
-    return;
+  // BUG FIX: Gunakan chunk 200 bytes (aman untuk hampir semua printer Android)
+  const CHUNK_SIZE=200;
+  for(let i=0;i<data.length;i+=CHUNK_SIZE){
+    const chunk=data.slice(i,i+CHUNK_SIZE);
+    // BUG FIX: Coba writeValueWithoutResponse dulu, fallback ke writeValue
+    let success=false;
+    if(btCharacteristic.properties.writeWithoutResponse){
+      try{
+        await btCharacteristic.writeValueWithoutResponse(chunk);
+        success=true;
+      }catch(e){/* fallback */}
+    }
+    if(!success){
+      try{
+        await btCharacteristic.writeValue(chunk);
+      }catch(e){
+        throw new Error('Gagal kirim data ke printer: '+e.message);
+      }
+    }
+    // BUG FIX: Delay 80ms antar chunk — cukup untuk printer thermal Android (50ms sering overflow)
+    await new Promise(r=>setTimeout(r,80));
   }
-  // Web mode: char adalah BluetoothRemoteGATTCharacteristic
-  const canWWR=typeof char.writeValueWithoutResponse==='function'&&char.properties.writeWithoutResponse;
-  if(canWWR){await char.writeValueWithoutResponse(data);return;}
-  const canWWRp=typeof char.writeValueWithResponse==='function'&&char.properties.write;
-  if(canWWRp){await char.writeValueWithResponse(data);return;}
-  if(typeof char.writeValue==='function'){await char.writeValue(data);return;}
-  throw new Error('Characteristic tidak support write');
 }
 
-// ── PRINT THERMAL (main entry point) ─────────────────────────────────
+// BUG FIX: printThermal — hapus countdown 10 detik yang tidak perlu
+// Ganti dengan delay 3 detik yang cukup untuk printer selesai memotong kertas
 async function printThermal(){
-  if(!btCharacteristic&&!_nativeBtDeviceId){toast('Hubungkan printer dulu!','error');return;}
+  if(!btCharacteristic){toast('Hubungkan printer dulu!','error');return;}
   if(!lastSaleData){toast('Data struk tidak tersedia.','error');return;}
+
   const btnP=document.getElementById('btn-bt-print');
-  if(!btnP) return;
   const origText=btnP.textContent;
   btnP.disabled=true;
-  const delaySec=Math.max(0,Math.min(30,Number(strukCfg.delay_rangkap2)||8));
+
+  // Ambil delay dari pengaturan (default 8 detik, min 0, max 30)
+  const delaySec = Math.max(0, Math.min(30, Number(strukCfg.delay_rangkap2)||8));
+
   try{
     btnP.textContent='⏳ Print Rangkap 1/2...';
-    await doPrintCopy(lastSaleData,1);
+    await doPrintCopy(lastSaleData, 1);
     toast('Rangkap 1 tercetak ✓','success');
+
+    // Countdown sebelum rangkap 2 (sesuai pengaturan)
     for(let s=delaySec;s>0;s--){
       btnP.textContent='⏳ Rangkap 2 dalam '+s+'s...';
       await new Promise(r=>setTimeout(r,1000));
     }
+
     btnP.textContent='⏳ Print Rangkap 2/2...';
-    await doPrintCopy(lastSaleData,2);
+    await doPrintCopy(lastSaleData, 2);
     toast('Rangkap 2 tercetak ✓','success');
   }catch(err){
     toast('Gagal print: '+err.message,'error');
   }finally{
-    if(btnP){btnP.textContent=origText;btnP.disabled=false;}
+    btnP.textContent=origText;
+    btnP.disabled=false;
   }
 }
 
+// ── Konversi foto B&W ke ESC/POS raster image bytes ──
 async function fotoToEscPos(dataUrl){
   return new Promise((resolve, reject)=>{
     const img = new Image();
@@ -3712,62 +3423,29 @@ async function fotoToEscPos(dataUrl){
       }
       ctx.putImageData(imgData,0,0);
       // Build ESC/POS raster bitmap bytes
-      // BUG FIX: GS v 0 (0x1D 0x76 0x30) sudah deprecated di ESC/POS spesifikasi terbaru.
-      // Gunakan GS ( L (GraphicData, 0x1D 0x28 0x4C) untuk Epson TM-series modern.
-      // Printer generik China biasanya masih support GS v 0 — simpan sebagai fallback.
-      // Fungsi ini mengembalikan KEDUA format:
-      //   .modern  → GS ( L (Epson modern, Seiko, beberapa Xprinter terbaru)
-      //   .legacy  → GS v 0  (Zjiang, Rongta, printer generik China lama)
-      // doPrintCopy() akan coba .modern dulu; jika printer tidak merespons pakai .legacy.
+      // GS v 0 — raster bit image
+      const bytes = [];
       const bytesPerRow = Math.ceil(printerW / 8);
-      const pixelData = [];
+      // GS v 0 header
+      bytes.push(0x1D, 0x76, 0x30, 0x00); // GS v 0 (normal)
+      bytes.push(bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF); // xL xH
+      bytes.push(h & 0xFF, (h >> 8) & 0xFF);                    // yL yH
+      // Pixel data
       for(let y=0;y<h;y++){
         for(let bx=0;bx<bytesPerRow;bx++){
-          let byt=0;
+          let byte=0;
           for(let bit=0;bit<8;bit++){
-            const x=bx*8+bit;
+            const x = bx*8+bit;
             if(x<printerW){
               const idx=(y*printerW+x)*4;
-              if(d[idx]<128) byt|=(0x80>>bit);
+              // Pixel hitam = bit 1 (printer thermal: 1=cetak, 0=kosong)
+              if(d[idx]<128) byte |= (0x80 >> bit);
             }
           }
-          pixelData.push(byt);
+          bytes.push(byte);
         }
       }
-
-      // Format modern: GS ( L
-      // Struktur: GS ( L pL pH m fn a bx by c xL xH yL yH [data]
-      // m=0x30 (function 112), fn=0x70 (store raster), a=0x30 (mono), bx=by=0x01 (1x scale)
-      const dataLen = pixelData.length;
-      const totalParamBytes = 10 + dataLen; // 10 byte header parameter
-      const pL = totalParamBytes & 0xFF;
-      const pH = (totalParamBytes >> 8) & 0xFF;
-      const xL = bytesPerRow & 0xFF, xH = (bytesPerRow >> 8) & 0xFF;
-      const yL = h & 0xFF, yH = (h >> 8) & 0xFF;
-      const modernBytes = [
-        0x1D, 0x28, 0x4C,        // GS ( L
-        pL, pH,                   // pL pH (panjang parameter)
-        0x30,                     // m = 48 (model)
-        0x70,                     // fn = 112 (store raster image)
-        0x30,                     // a = 48 (mono 1bpp)
-        0x01, 0x01,               // bx by = 1x scale
-        0x31,                     // c = 49 (color: black)
-        xL, xH,                   // xL xH (lebar dalam bytes)
-        yL, yH,                   // yL yH (tinggi dalam dots)
-        ...pixelData,
-        // GS ( L print stored image
-        0x1D, 0x28, 0x4C, 0x02, 0x00, 0x30, 0x32
-      ];
-
-      // Format legacy: GS v 0 (tetap didukung printer generik China)
-      const legacyBytes = [
-        0x1D, 0x76, 0x30, 0x00,   // GS v 0 (normal size)
-        xL, xH,                   // xL xH (bytes per baris)
-        yL, yH,                   // yL yH (jumlah baris)
-        ...pixelData
-      ];
-
-      resolve({ modern: modernBytes, legacy: legacyBytes });
+      resolve(bytes);
     };
     img.onerror = reject;
     img.src = dataUrl;
@@ -3786,18 +3464,8 @@ async function doPrintCopy(sale, copyNum){
     // ── Cetak Foto (jika ada) ──
     if(strukFotoBwDataUrl){
       try {
-        const foto = await fotoToEscPos(strukFotoBwDataUrl);
-        // BUG FIX: coba format GS ( L (modern) dulu.
-        // Jika printer tidak kenal perintah ini, data pixel mungkin dicetak sebagai teks acak.
-        // Kirim modern format dulu; jika ukuran data terlalu besar untuk buffer BLE
-        // atau printer generik, gunakan legacy GS v 0 sebagai fallback.
-        // Heuristik: printer generik China (<= firmware 2019) biasanya tidak support GS ( L.
-        // Kita coba modern terlebih dahulu karena sudah menjadi standard ESC/POS sejak 2014.
-        try {
-          b.push(...foto.modern);
-        } catch(_) {
-          b.push(...foto.legacy);
-        }
+        const fotoBytes = await fotoToEscPos(strukFotoBwDataUrl);
+        b.push(...fotoBytes);
         b.push(...FEED(1));
       } catch(e){ console.warn('Gagal cetak foto:', e); }
     }
@@ -3816,8 +3484,7 @@ async function doPrintCopy(sale, copyNum){
     b.push(...encBytes(dtStr),...LF);
 
     b.push(...ESC_BOLD_ON);
-    // BUG FIX: Hapus centerStr() — tidak perlu karena ESC_CENTER sudah aktif sejak baris header
-    b.push(...encBytes('[ RANGKAP 1 - PELANGGAN ]'),...LF);
+    b.push(...encBytes(centerStr('[ RANGKAP 1 - PELANGGAN ]',W)),...LF);
     b.push(...ESC_BOLD_OFF,...ESC_LEFT);
 
     b.push(...encBytes(dash(W)),...LF);
@@ -3826,10 +3493,8 @@ async function doPrintCopy(sale, copyNum){
     b.push(...encBytes(twoCol('Pelanggan:',sale.customer||'Umum',W)),...LF);
     if(strukCfg.header_custom){
       b.push(...encBytes(dash(W)),...LF);
-      // BUG FIX: Header custom dicetak center sesuai tampilan di layar
       b.push(...ESC_CENTER);
       strukCfg.header_custom.split('\n').filter(Boolean).forEach(l=>b.push(...encBytes(l),...LF));
-      // BUG FIX: Reset ke LEFT setelah header_custom agar baris berikutnya tidak ikut center
       b.push(...ESC_LEFT);
     }
     b.push(...encBytes(dash(W)),...LF);
@@ -3846,14 +3511,7 @@ async function doPrintCopy(sale, copyNum){
     b.push(...ESC_BOLD_ON);
     b.push(...encBytes(twoCol('TOTAL','Rp'+fmtThermal(sale.total),W)),...LF);
     b.push(...ESC_BOLD_OFF);
-    // BUG FIX: Untuk tunai, tampilkan nominal dibayar = total + kembalian
-    // Sebelumnya hanya tampil metode (e.g. "TUNAI") tanpa nominal
-    if(sale.payment==='tunai'){
-      const dibayar=sale.total+Math.max(0,Number(sale.change)||0);
-      b.push(...encBytes(twoCol('Dibayar (Tunai)','Rp'+fmtThermal(dibayar),W)),...LF);
-    } else {
-      b.push(...encBytes(twoCol('Dibayar ('+(sale.payment||'').toUpperCase()+')', 'Rp'+fmtThermal(sale.total),W)),...LF);
-    }
+    b.push(...encBytes(twoCol('Bayar',(sale.payment||'').toUpperCase(),W)),...LF);
     if(Number(sale.change)>0)
       b.push(...encBytes(twoCol('Kembalian','Rp'+fmtThermal(sale.change),W)),...LF);
 
@@ -3875,8 +3533,7 @@ async function doPrintCopy(sale, copyNum){
     b.push(...ESC_BOLD_OFF);
     b.push(...encBytes(dtShort),...LF);
     b.push(...ESC_BOLD_ON);
-    // BUG FIX: Hapus centerStr() — tidak perlu karena ESC_CENTER sudah aktif
-    b.push(...encBytes('[ DAPUR / ARSIP ]'),...LF);
+    b.push(...encBytes(centerStr('[ DAPUR / ARSIP ]',W)),...LF);
     b.push(...ESC_BOLD_OFF,...ESC_LEFT);
 
     b.push(...encBytes(dash(W)),...LF);
@@ -3899,10 +3556,9 @@ async function doPrintCopy(sale, copyNum){
     b.push(...ESC_BOLD_OFF);
   }
 
-  // Feed & cut — pisahkan feed dari cut agar cutPaper() bisa fallback ke full cut jika perlu
-  b.push(...FEED(4));
+  // Feed & cut
+  b.push(...FEED(4),...ESC_CUT);
   await sendToPrinter(b);
-  await cutPaper(_nativeBtDeviceId ? '__native__' : btCharacteristic);
 }
 
 function centerStr(text,W=32){
@@ -3911,7 +3567,6 @@ function centerStr(text,W=32){
   const p=Math.floor((W-s.length)/2);
   return ' '.repeat(p)+s;
 }
-
 
 // ===================== INVENTORY =====================
 let editingProduct=null, productImageData='';
@@ -7041,13 +6696,13 @@ async function doCloseShift(){
     else renderShift();
     toast('Shift ditutup. Selamat beristirahat! 🔴','success');
     setTimeout(async ()=>{
-      const printerReady=!!(btCharacteristic||_nativeBtDeviceId);
+      const printerReady=!!btCharacteristic;
       if(printerReady){
         if(confirm('Cetak rekap shift ke printer thermal?')) await printShiftRekap(updatedShift);
       } else {
         if(confirm('Cetak rekap shift?\n\n(Printer belum terhubung — akan diminta konek sekarang)')){
           await connectBluetooth();
-          if(btCharacteristic||_nativeBtDeviceId) await printShiftRekap(updatedShift);
+          if(btCharacteristic) await printShiftRekap(updatedShift);
         }
       }
     }, 500);
@@ -7116,13 +6771,13 @@ function viewShiftDetail(shiftId){
 }
 
 async function printShiftRekap(sh){
-  // Cek koneksi printer — support Web Bluetooth & Capacitor native BLE
-  const isConnected = !!(btCharacteristic || _nativeBtDeviceId);
+  // Cek koneksi printer
+  const isConnected = !!btCharacteristic;
   if(!isConnected){
     // Tawarkan koneksi langsung jika belum terhubung
     if(confirm('Printer belum terhubung.\nHubungkan printer sekarang?')){
       await connectBluetooth();
-      if(!(btCharacteristic||_nativeBtDeviceId)){
+      if(!btCharacteristic){
         toast('Printer tidak terhubung, cetak dibatalkan.','error');
         return;
       }
@@ -7195,8 +6850,6 @@ async function printShiftRekap(sh){
 
   try{
     await sendToPrinter(b);
-    // cutPaper: native mode pakai sentinel '__native__', web mode pakai btCharacteristic
-    await cutPaper(_nativeBtDeviceId ? '__native__' : btCharacteristic);
     toast('Rekap shift tercetak ✓','success');
   }catch(e){
     toast('Gagal cetak: '+e.message,'error');
